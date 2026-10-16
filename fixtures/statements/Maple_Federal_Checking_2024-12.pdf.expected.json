@@ -1,0 +1,101 @@
+{
+  "account": "Maple Federal Checking",
+  "accountType": "Bank",
+  "periodStart": "2024-12-01",
+  "periodEnd": "2024-12-31",
+  "openingBalance": 8999.58,
+  "closingBalance": 3953.55,
+  "expectReconciliation": "ok",
+  "transactions": [
+    {
+      "date": "2024-12-01",
+      "description": "DEBIT CARD PURCHASE 12/01 TST* LUIGIS TRATTORIA FAIRVIEW OR",
+      "amount": -45.91
+    },
+    {
+      "date": "2024-12-02",
+      "description": "ACH DEBIT PINECREST HOME LOANS MTG PYMT PPD ID: 4417730021",
+      "amount": -2385
+    },
+    {
+      "date": "2024-12-02",
+      "description": "POS DEBIT 11/30 CHEVRON 0098812 FAIRVIEW OR",
+      "amount": -59.1
+    },
+    {
+      "date": "2024-12-02",
+      "description": "DEBIT CARD PURCHASE 12/01 FRED-MEYER #0651 GRESHAM OR",
+      "amount": -30.32
+    },
+    {
+      "date": "2024-12-02",
+      "description": "ATM WITHDRAWAL 12/02 MAPLE FEDERAL ATM #2210 2210 MAIN ST FAIRVIEW OR",
+      "amount": -60
+    },
+    {
+      "date": "2024-12-04",
+      "description": "POS RETURN 12/03 TARGET T-1544 GRESHAM OR",
+      "amount": 36.18
+    },
+    {
+      "date": "2024-12-05",
+      "description": "ONLINE TRANSFER TO MAPLE FEDERAL SAVINGS XXXXXX4471 REF #IB0RTV5F1",
+      "amount": -500
+    },
+    {
+      "date": "2024-12-09",
+      "description": "ACH DEBIT CASCADE POWER & LIGHT ONLINE PMT WEB ID: 9300012231",
+      "amount": -177.43
+    },
+    {
+      "date": "2024-12-09",
+      "description": "CHECK #1042",
+      "amount": -160
+    },
+    {
+      "date": "2024-12-12",
+      "description": "DEBIT CARD PURCHASE 12/11 SUBWAY 00412290 GRESHAM OR",
+      "amount": -34.34
+    },
+    {
+      "date": "2024-12-13",
+      "description": "ACH DEPOSIT BRIGHTLINE LOGISTICS PAYROLL PPD ID: 9100234517",
+      "amount": 2846.15
+    },
+    {
+      "date": "2024-12-16",
+      "description": "NON-MAPLE FEDERAL ATM FEE",
+      "amount": -3
+    },
+    {
+      "date": "2024-12-18",
+      "description": "ONLINE TRANSFER FROM MAPLE FEDERAL SAVINGS XXXXXX4471 REF #IBN8ZSZZ5",
+      "amount": 300
+    },
+    {
+      "date": "2024-12-20",
+      "description": "ONLINE PMT SUMMIT VISA ACCT ENDING 4417 CONF# J5G8CNSM",
+      "amount": -1850
+    },
+    {
+      "date": "2024-12-20",
+      "description": "DEBIT CARD PURCHASE 12/19 DUTCH BROS #OR0212 FAIRVIEW OR",
+      "amount": -11.27
+    },
+    {
+      "date": "2024-12-24",
+      "description": "HARBOR CARD AUTOPAY PPD ID: 7781000231",
+      "amount": -2662.55
+    },
+    {
+      "date": "2024-12-27",
+      "description": "ONLINE TRANSFER TO TIDEWATER ONLINE SAVINGS XXXXX7730 WEB ID: 1774400920",
+      "amount": -250
+    },
+    {
+      "date": "2024-12-31",
+      "description": "INTEREST PAYMENT",
+      "amount": 0.56
+    }
+  ]
+}

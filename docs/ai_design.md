@@ -26,25 +26,32 @@ Automate the ingestion and categorization of financial statements using locally 
 - [x] AI Categorization Pipeline (Ollama + Gemma 4)
 
 ### Phase 2: Backend API (`server/`)
-- [ ] NestJS scaffold, config, DB module, migration runner + idempotent migration 001
-- [ ] Statement discovery/upload, PDF extraction (pdf-parse v2), regex + LLM fallback parsers
-- [ ] Dedupe + background processing jobs (incremental / recategorize)
-- [ ] Transactions API with corrections + splits
-- [ ] Categories/accounts API, budget summary + trend
-- [ ] AI insights (summary + budget suggestions)
-- [ ] Unit tests (mocked LLM) + e2e tests (test DB)
+- [x] NestJS scaffold, config, DB module, migration runner + idempotent migration 001
+- [x] Statement discovery/upload, PDF extraction (pdf-parse v2), regex + LLM fallback parsers
+- [x] Dedupe + background processing jobs (incremental / recategorize)
+- [x] Transactions API with corrections + splits
+- [x] Categories/accounts API, budget summary + trend
+- [x] AI insights (summary + budget suggestions)
+- [x] Unit tests (mocked LLM) + e2e tests (test DB)
 
 ### Phase 3: Frontend (`client/`)
-- [ ] Angular scaffold, Material, API services, month picker + health indicator
-- [ ] Process page (upload, process/re-categorize, live job progress, history)
-- [ ] Transactions page (filters, inline category correction, split dialog)
-- [ ] Dashboard (totals, budget bars, insights w/ apply, trend)
-- [ ] Categories page
-- [ ] Component/service unit tests
+- [x] Angular scaffold, Material, API services, month picker + health indicator
+- [x] Process page (upload, process/re-categorize, live job progress, history)
+- [x] Transactions page (filters, inline category correction, split dialog)
+- [x] Dashboard (totals, budget bars, insights w/ apply, trend)
+- [x] Categories page
+- [x] Component/service unit tests
+
+### Phase 3b: Accuracy & automation (approved additions — see ARCHITECTURE.md "MVP additions")
+- [x] OFX/QFX import (exact dedupe by FITID) — frontend done ✓, backend done ✓
+- [x] Category rules learned from corrections (+ Rules page, "always categorize like this" prompt) — frontend done ✓, backend done ✓
+- [x] Statement reconciliation (opening + transactions = closing; flag missing rows) — frontend done ✓, backend done ✓
+- [x] Transfer matching across accounts (card payment ↔ checking payment) — frontend done ✓, backend done ✓
+- [x] Review queue: AI confidence + "Needs review" filter + bulk approve — frontend done ✓, backend done ✓
 
 ### Phase 4: Integration
-- [ ] End-to-end run against real Postgres + Ollama on synthetic data
-- [ ] Code review pass, docs/README refresh
+- [x] End-to-end run against real Postgres + Ollama on synthetic data
+- [x] Code review pass (client↔server contract cross-check), docs/README refresh
 
 ---
 
@@ -64,3 +71,10 @@ Example: adults see all categories; kids see only Restaurants, Entertainment, an
 
 Design notes for MVP work: keep category access going through the categories/budget services (not ad-hoc SQL
 in many places) so a visibility filter can be added in one spot later.
+
+## Later (after MVP, alongside or after Project Phase 2)
+- [ ] Recurring charge / subscription detection; alert on new subscriptions or price changes
+- [ ] Rollover budgets and annual expenses spread monthly (sinking funds)
+- [ ] Security when exposed on the home network: real auth, bind to LAN deliberately, HTTPS (comes with Phase 2 logins).
+      Until then the server binds to 127.0.0.1 only.
+- [ ] Backups: `npm run backup` (pg_dump + statements folder); keep real statements outside the repo via STATEMENTS_DIR

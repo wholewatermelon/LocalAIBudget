@@ -1,0 +1,97 @@
+.intro {
+  color: var(--mat-sys-on-surface-variant);
+  margin-top: -8px;
+}
+
+.block {
+  margin-bottom: 16px;
+}
+
+.form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+
+  .pattern {
+    flex: 1 1 220px;
+  }
+  .priority {
+    width: 100px;
+  }
+}
+
+.preview {
+  margin-top: 12px;
+}
+
+.sample {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+
+  li {
+    display: grid;
+    grid-template-columns: 96px minmax(0, 1fr) 140px 100px;
+    gap: 8px;
+    padding: 4px 0;
+    border-top: 1px solid var(--mat-sys-outline-variant);
+  }
+  .desc {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+.muted {
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.error {
+  color: var(--mat-sys-error);
+}
+
+.table-card {
+  border: 1px solid var(--mat-sys-outline-variant);
+  border-radius: 12px;
+  overflow-x: auto;
+}
+
+.rules {
+  width: 100%;
+  border-collapse: collapse;
+
+  th,
+  td {
+    text-align: left;
+    padding: 6px 12px;
+    border-bottom: 1px solid var(--mat-sys-outline-variant);
+  }
+  th {
+    font: var(--mat-sys-label-medium);
+    color: var(--mat-sys-on-surface-variant);
+  }
+  .num {
+    text-align: right;
+  }
+}
+
+.cell-field {
+  width: 220px;
+  --mat-form-field-container-height: 36px;
+  --mat-form-field-container-vertical-padding: 6px;
+
+  &.narrow {
+    width: 160px;
+  }
+  &.tiny {
+    width: 80px;
+  }
+}
+
+@media (max-width: 599px) {
+  .sample li {
+    grid-template-columns: 1fr;
+  }
+}

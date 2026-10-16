@@ -1,0 +1,230 @@
+<div class="page">
+  <div class="page-header">
+    <h1>Transactions · {{ monthLabel() }}</h1>
+  </div>
+
+  <div class="filters">
+    <mat-form-field appearance="outline" subscriptSizing="dynamic" class="search">
+      <mat-label>Search</mat-label>
+      <mat-icon matPrefix>search</mat-icon>
+      <input
+        matInput
+        [ngModel]="searchText()"
+        (ngModelChange)="searchText.set($event)"
+        placeholder="Description…"
+        data-testid="search"
+      />
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" subscriptSizing="dynamic">
+      <mat-label>Account</mat-label>
+      <mat-select [ngModel]="accountId()" (ngModelChange)="accountId.set($event)">
+        <mat-option [value]="null">All accounts</mat-option>
+        @for (a of accounts(); track a.id) {
+          <mat-option [value]="a.id">{{ a.accountName }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" subscriptSizing="dynamic">
+      <mat-label>Category</mat-label>
+      <mat-select
+        [ngModel]="categoryId()"
+        (ngModelChange)="categoryId.set($event)"
+        [disabled]="uncategorizedOnly()"
+      >
+        <mat-option [value]="null">All categories</mat-option>
+        @for (c of categories(); track c.id) {
+          <mat-option [value]="c.id">{{ c.name }}</mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+
+    <mat-checkbox
+      [ngModel]="uncategorizedOnly()"
+      (ngModelChange)="uncategorizedOnly.set($event)"
+      data-testid="uncategorized-only"
+    >
+      Uncategorized only
+    </mat-checkbox>
+
+    <mat-chip-listbox aria-label="Review filter">
+      <mat-chip-option
+        [selected]="needsReviewOnly()"
+        (selectionChange)="needsReviewOnly.set($event.selected)"
+        data-testid="needs-review-chip"
+      >
+        <mat-icon matChipAvatar>flag</mat-icon>
+        Needs review ({{ needsReviewCount() }})
+      </mat-chip-option>
+    </mat-chip-listbox>
+
+    @if (hasFilters()) {
+      <button mat-button (click)="clearFilters()">Clear filters</button>
+    }
+  </div>
+
+  @if (reviewableSelected().length) {
+    <div class="bulk-bar" data-testid="bulk-bar">
+      <span>{{ reviewableSelected().length }} selected</span>
+      <button mat-flat-button (click)="approveSelected()" data-testid="bulk-approve">
+        <mat-icon>done_all</mat-icon> Looks good
+      </button>
+      <button mat-button (click)="toggleAllReview(false)">Clear selection</button>
+    </div>
+  }
+
+  <div class="table-card">
+    @if (loading()) {
+      <mat-progress-bar mode="indeterminate" />
+    }
+    <div class="table-scroll">
+      <table mat-table [dataSource]="dataSource" matSort matSortActive="date" matSortDirection="desc">
+        <ng-container matColumnDef="select">
+          <th mat-header-cell *matHeaderCellDef class="select-cell">
+            <mat-checkbox
+              [checked]="allReviewSelected()"
+              [indeterminate]="reviewableSelected().length > 0 && !allReviewSelected()"
+              (change)="toggleAllReview($event.checked)"
+              matTooltip="Select all that need review"
+              aria-label="Select all transactions that need review"
+            />
+          </th>
+          <td mat-cell *matCellDef="let t" class="select-cell">
+            @if (t.needsReview) {
+              <mat-checkbox
+                [checked]="selected().has(t.id)"
+                (change)="toggleSelected(t.id, $event.checked)"
+                [attr.aria-label]="'Select ' + t.description"
+              />
+            }
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="date">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Date</th>
+          <td mat-cell *matCellDef="let t" class="nowrap tabular">{{ t.date }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="description">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Description</th>
+          <td mat-cell *matCellDef="let t" class="desc">
+            {{ t.description }}
+            @if (t.transferPairId) {
+              <div class="pair" data-testid="transfer-pair" matTooltip="Matched transfer between your accounts">
+                ↔ {{ t.transferPairAccountName ?? 'linked account' }}
+              </div>
+            }
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="account">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Account</th>
+          <td mat-cell *matCellDef="let t" class="nowrap">{{ t.accountName ?? '—' }}</td>
+        </ng-container>
+
+        <ng-container matColumnDef="amount">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header arrowPosition="before" class="num">Amount</th>
+          <td mat-cell *matCellDef="let t" class="num tabular" [class.money-pos]="t.amount > 0">
+            {{ t.amount | currency }}
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="category">
+          <th mat-header-cell *matHeaderCellDef mat-sort-header>Category</th>
+          <td mat-cell *matCellDef="let t" class="cat-cell">
+            @if (t.splits.length) {
+              <span class="split-summary" [matTooltip]="splitTooltip(t)" matTooltipClass="pre-tooltip">
+                Split across {{ t.splits.length }}
+              </span>
+            } @else {
+              <mat-form-field appearance="outline" subscriptSizing="dynamic" class="inline-select">
+                <mat-select
+                  [value]="t.categoryId"
+                  (selectionChange)="changeCategory(t, $event.value)"
+                  [disabled]="saving().has(t.id)"
+                  placeholder="Uncategorized"
+                  [attr.aria-label]="'Category for ' + t.description"
+                  data-testid="row-category"
+                >
+                  <mat-option [value]="null"><em>Uncategorized</em></mat-option>
+                  @for (c of categories(); track c.id) {
+                    <mat-option [value]="c.id">{{ c.name }}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+            }
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="source">
+          <th mat-header-cell *matHeaderCellDef>Source</th>
+          <td mat-cell *matCellDef="let t" class="nowrap">
+            @if (t.splits.length) {
+              <span class="badge badge-split">split</span>
+            }
+            @if (t.categorizedBy === 'manual') {
+              <span class="badge badge-manual" matTooltip="Manually corrected — AI won't change it">manual</span>
+            } @else if (t.categorizedBy === 'ai') {
+              <span class="badge badge-ai">ai</span>
+              @if (t.aiConfidence != null) {
+                <span
+                  class="confidence tabular"
+                  [class.low]="t.aiConfidence < 0.7"
+                  matTooltip="AI confidence"
+                  data-testid="confidence"
+                >{{ t.aiConfidence * 100 | number: '1.0-0' }}%</span>
+              }
+            } @else if (t.categorizedBy === 'rule') {
+              <span class="badge badge-rule" matTooltip="Categorized by one of your rules">rule</span>
+            } @else if (t.categorizedBy === 'transfer') {
+              <span class="badge badge-transfer" matTooltip="Matched transfer between accounts">transfer</span>
+            } @else if (t.categorizedBy) {
+              <span class="badge">{{ t.categorizedBy }}</span>
+            }
+          </td>
+        </ng-container>
+
+        <ng-container matColumnDef="actions">
+          <th mat-header-cell *matHeaderCellDef></th>
+          <td mat-cell *matCellDef="let t" class="nowrap">
+            @if (t.needsReview) {
+              <button
+                mat-icon-button
+                (click)="markReviewed(t)"
+                matTooltip="Looks good — mark as reviewed"
+                [attr.aria-label]="'Mark ' + t.description + ' as reviewed'"
+                data-testid="looks-good"
+                class="review-btn"
+              >
+                <mat-icon>check</mat-icon>
+              </button>
+            }
+            <button mat-icon-button (click)="openSplit(t)" matTooltip="Split" [attr.aria-label]="'Split ' + t.description">
+              <mat-icon>call_split</mat-icon>
+            </button>
+          </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="columns; sticky: true"></tr>
+        <tr
+          mat-row
+          *matRowDef="let row; columns: columns"
+          data-testid="tx-row"
+          [class.needs-review]="row.needsReview"
+        ></tr>
+        <tr class="mat-row" *matNoDataRow>
+          <td class="mat-cell empty-state" [attr.colspan]="columns.length">
+            @if (loading()) {
+              Loading…
+            } @else if (hasFilters()) {
+              No transactions match these filters.
+            } @else {
+              No transactions for this month. Upload and process statements first.
+            }
+          </td>
+        </tr>
+      </table>
+    </div>
+  </div>
+</div>

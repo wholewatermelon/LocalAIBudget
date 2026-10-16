@@ -50,8 +50,14 @@ corrections or splits.
 
 ### Sample data
 ```bash
-npm run generate:fake   # creates synthetic statements for 2024-01..2024-03 in data/statements/
+npm run generate:fake       # realistic synthetic statements for 2024-11..2025-01 in data/statements/
+npm run generate:fixtures   # regenerate the committed parser fixtures in fixtures/statements/
+node scripts/inspect-pdf.js data/statements/2024-11/Summit_Rewards_Visa_2024-11.pdf   # see what pdf-parse extracts
 ```
+One fictional household, four accounts at fictional institutions, in the formats real banks export: checking PDF
+(running balance, wrapped rows, multi-page), checking CSV + OFX, card PDF (trans/post dates, sections, APR table),
+card CSV and QFX, and an old-style TXT. `fixtures/statements/` holds one small file per layout plus an `.expected.json`
+with the exact sign-normalized transactions a parser must produce — see `fixtures/statements/README.md`.
 
 ## Tests
 ```bash

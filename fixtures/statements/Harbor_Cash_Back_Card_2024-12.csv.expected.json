@@ -1,0 +1,69 @@
+{
+  "account": "Harbor Cash Back Card",
+  "accountType": "Credit Card",
+  "periodStart": "2024-12-01",
+  "periodEnd": "2024-12-31",
+  "expectReconciliation": "unknown",
+  "transactions": [
+    {
+      "date": "2024-12-01",
+      "description": "CVS/PHARMACY #10422 GRESHAM OR",
+      "amount": -8.61
+    },
+    {
+      "date": "2024-12-02",
+      "description": "APPLE.COM/BILL 866-712-7753 CA",
+      "amount": -9.99
+    },
+    {
+      "date": "2024-12-02",
+      "description": "TRADER JOE S #145 PORTLAND OR",
+      "amount": -183.38
+    },
+    {
+      "date": "2024-12-03",
+      "description": "LYFT *RIDE SAT 6PM, SAN FRANCISCO CA",
+      "amount": -15.31
+    },
+    {
+      "date": "2024-12-07",
+      "description": "SQ *SMITH & SONS, LLC PORTLAND OR",
+      "amount": -47.18
+    },
+    {
+      "date": "2024-12-08",
+      "description": "FRED-MEYER FUEL #0651 GRESHAM OR",
+      "amount": -57.45
+    },
+    {
+      "date": "2024-12-09",
+      "description": "THE HOME DEPOT #4012 GRESHAM OR",
+      "amount": 42.18
+    },
+    {
+      "date": "2024-12-13",
+      "description": "THE HOME DEPOT #4012 GRESHAM OR",
+      "amount": -40.48
+    },
+    {
+      "date": "2024-12-17",
+      "description": "LYFT *RIDE FRI 6PM, SAN FRANCISCO CA",
+      "amount": -9.71
+    },
+    {
+      "date": "2024-12-19",
+      "description": "UBER *EATS PENDING HELP.UBER.COM CA",
+      "amount": -26.8
+    },
+    {
+      "date": "2024-12-23",
+      "description": "AUTOMATIC PAYMENT - THANK YOU",
+      "amount": 2662.55
+    },
+    {
+      "date": "2024-12-26",
+      "description": "PANDA EXPRESS #1912 GRESHAM OR",
+      "amount": -54.3
+    }
+  ]
+}

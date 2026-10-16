@@ -1,0 +1,165 @@
+<div class="page">
+  <div class="page-header">
+    <h1>Rules</h1>
+  </div>
+  <p class="intro">
+    Rules categorize matching transactions before the AI runs, so recurring merchants are always right.
+    Manual corrections still win over rules.
+  </p>
+
+  <mat-card appearance="outlined" class="block">
+    <mat-card-header><mat-card-title>New rule</mat-card-title></mat-card-header>
+    <mat-card-content>
+      <form class="form" (ngSubmit)="create()">
+        <mat-form-field appearance="outline" subscriptSizing="dynamic" class="pattern">
+          <mat-label>Description pattern</mat-label>
+          <input
+            matInput
+            name="pattern"
+            [ngModel]="pattern()"
+            (ngModelChange)="pattern.set($event)"
+            placeholder="AMZN MKTP"
+            data-testid="rule-pattern"
+          />
+        </mat-form-field>
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+          <mat-label>Match</mat-label>
+          <mat-select name="matchType" [ngModel]="matchType()" (ngModelChange)="matchType.set($event)">
+            @for (m of matchTypes; track m.value) {
+              <mat-option [value]="m.value">{{ m.label }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+        <mat-form-field appearance="outline" subscriptSizing="dynamic">
+          <mat-label>Category</mat-label>
+          <mat-select name="categoryId" [ngModel]="categoryId()" (ngModelChange)="categoryId.set($event)">
+            @for (c of categoryStore.categories(); track c.id) {
+              <mat-option [value]="c.id">{{ c.name }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+        <mat-form-field appearance="outline" subscriptSizing="dynamic" class="priority">
+          <mat-label>Priority</mat-label>
+          <input matInput type="number" step="1" name="priority" [ngModel]="priority()" (ngModelChange)="priority.set(+$event || 0)" />
+        </mat-form-field>
+        <mat-checkbox name="apply" [ngModel]="applyToExisting()" (ngModelChange)="applyToExisting.set($event)">
+          Apply to existing transactions
+        </mat-checkbox>
+        <button mat-flat-button type="submit" [disabled]="!canCreate()" data-testid="create-rule">
+          <mat-icon>add</mat-icon> Create rule
+        </button>
+      </form>
+
+      @if (formError()) {
+        <p class="error">{{ formError() }}</p>
+      }
+
+      <div class="preview" data-testid="rule-preview">
+        @if (previewing()) {
+          <mat-progress-bar mode="indeterminate" />
+        } @else if (previewError()) {
+          <p class="error">{{ previewError() }}</p>
+        } @else if (preview(); as p) {
+          <p>
+            <strong>{{ p.matchCount }}</strong> matching transaction{{ p.matchCount === 1 ? '' : 's' }}
+            @if (p.sample.length < p.matchCount) {
+              (showing {{ p.sample.length }})
+            }
+          </p>
+          @if (p.sample.length) {
+            <ul class="sample">
+              @for (t of p.sample; track t.id) {
+                <li>
+                  <span class="tabular">{{ t.date }}</span>
+                  <span class="desc">{{ t.description }}</span>
+                  <span class="muted">{{ t.categoryName ?? 'Uncategorized' }}</span>
+                  <span class="tabular">{{ t.amount | currency }}</span>
+                </li>
+              }
+            </ul>
+          }
+        } @else if (!pattern().trim()) {
+          <p class="muted">Type a pattern to preview which transactions it would match.</p>
+        }
+      </div>
+    </mat-card-content>
+  </mat-card>
+
+  <div class="table-card">
+    @if (loading()) {
+      <mat-progress-bar mode="indeterminate" />
+    }
+    @if (loaded() && rules().length === 0) {
+      <p class="empty-state">
+        No rules yet. Create one above, or accept the "Always categorize…" prompt after correcting a transaction.
+      </p>
+    } @else {
+      <table class="rules">
+        <thead>
+          <tr>
+            <th>Pattern</th>
+            <th>Match</th>
+            <th>Category</th>
+            <th>Priority</th>
+            <th class="num">Hits</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (r of rules(); track r.id) {
+            <tr data-testid="rule-row">
+              <td>
+                <mat-form-field appearance="outline" subscriptSizing="dynamic" class="cell-field">
+                  <input
+                    matInput
+                    #pat
+                    [value]="r.pattern"
+                    (change)="save(r, { pattern: pat.value })"
+                    [attr.aria-label]="'Pattern ' + r.pattern"
+                  />
+                </mat-form-field>
+              </td>
+              <td>
+                <mat-form-field appearance="outline" subscriptSizing="dynamic" class="cell-field narrow">
+                  <mat-select [value]="r.matchType" (selectionChange)="save(r, { matchType: $event.value })" aria-label="Match type">
+                    @for (m of matchTypes; track m.value) {
+                      <mat-option [value]="m.value">{{ m.label }}</mat-option>
+                    }
+                  </mat-select>
+                </mat-form-field>
+              </td>
+              <td>
+                <mat-form-field appearance="outline" subscriptSizing="dynamic" class="cell-field narrow">
+                  <mat-select [value]="r.categoryId" (selectionChange)="save(r, { categoryId: $event.value })" aria-label="Category">
+                    @for (c of categoryStore.categories(); track c.id) {
+                      <mat-option [value]="c.id">{{ c.name }}</mat-option>
+                    }
+                  </mat-select>
+                </mat-form-field>
+              </td>
+              <td>
+                <mat-form-field appearance="outline" subscriptSizing="dynamic" class="cell-field tiny">
+                  <input
+                    matInput
+                    #prio
+                    type="number"
+                    step="1"
+                    [value]="r.priority"
+                    (change)="save(r, { priority: +prio.value })"
+                    aria-label="Priority"
+                  />
+                </mat-form-field>
+              </td>
+              <td class="num tabular">{{ r.hits }}</td>
+              <td>
+                <button mat-icon-button (click)="remove(r)" matTooltip="Delete rule" [attr.aria-label]="'Delete rule ' + r.pattern">
+                  <mat-icon>delete</mat-icon>
+                </button>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    }
+  </div>
+</div>

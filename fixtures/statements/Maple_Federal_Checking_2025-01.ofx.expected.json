@@ -1,0 +1,70 @@
+{
+  "account": "Maple Federal Checking",
+  "accountType": "Bank",
+  "periodStart": "2025-01-01",
+  "periodEnd": "2025-01-31",
+  "closingBalance": 6535.4,
+  "expectReconciliation": "unknown",
+  "transactions": [
+    {
+      "date": "2025-01-02",
+      "description": "ACH DEBIT PINECREST HOME LOANS MTG PYMT PPD ID: 4417730021",
+      "amount": -2385
+    },
+    {
+      "date": "2025-01-02",
+      "description": "POS DEBIT 12/31 SHELL OIL 57442",
+      "amount": -63.16
+    },
+    {
+      "date": "2025-01-02",
+      "description": "ATM WITHDRAWAL 01/02 MAPLE FEDERAL ATM #2210 2210 MAIN ST FAIRVIEW OR",
+      "amount": -200
+    },
+    {
+      "date": "2025-01-08",
+      "description": "ACH DEBIT CASCADE POWER & LIGHT ONLINE PMT WEB ID: 9300012231",
+      "amount": -213.31
+    },
+    {
+      "date": "2025-01-08",
+      "description": "VENMO CASHOUT PPD ID: 5264681992",
+      "amount": 72.5
+    },
+    {
+      "date": "2025-01-09",
+      "description": "CHECK #1043",
+      "amount": -160
+    },
+    {
+      "date": "2025-01-10",
+      "description": "ACH DEPOSIT BRIGHTLINE LOGISTICS PAYROLL PPD ID: 9100234517",
+      "amount": 2846.15
+    },
+    {
+      "date": "2025-01-13",
+      "description": "DEBIT CARD PURCHASE 01/11 SUBWAY 00412290 GRESHAM OR",
+      "amount": -47.84
+    },
+    {
+      "date": "2025-01-21",
+      "description": "ONLINE PMT SUMMIT VISA ACCT ENDING 4417 CONF# F1QEWB6A",
+      "amount": -2275
+    },
+    {
+      "date": "2025-01-21",
+      "description": "DEBIT CARD PURCHASE 01/20 MCDONALD'S F21877 FAIRVIEW OR",
+      "amount": -21.04
+    },
+    {
+      "date": "2025-01-29",
+      "description": "MOBILE DEPOSIT REF NUMBER :418820557731",
+      "amount": 125
+    },
+    {
+      "date": "2025-01-31",
+      "description": "INTEREST PAYMENT",
+      "amount": 0.49
+    }
+  ]
+}

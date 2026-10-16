@@ -1,0 +1,60 @@
+{
+  "account": "Harbor Cash Back Card",
+  "accountType": "Credit Card",
+  "periodStart": "2024-11-01",
+  "periodEnd": "2024-11-30",
+  "closingBalance": 419.64,
+  "expectReconciliation": "unknown",
+  "transactions": [
+    {
+      "date": "2024-11-03",
+      "description": "FRED-MEYER FUEL #0651 GRESHAM OR",
+      "amount": -37.71
+    },
+    {
+      "date": "2024-11-04",
+      "description": "APPLE.COM/BILL 866-712-7753 CA",
+      "amount": -9.99
+    },
+    {
+      "date": "2024-11-06",
+      "description": "DOORDASH*THAI BASIL, FAIRVIEW OR",
+      "amount": -52.19
+    },
+    {
+      "date": "2024-11-07",
+      "description": "UBER *EATS PENDING HELP.UBER.COM",
+      "amount": -62.63
+    },
+    {
+      "date": "2024-11-09",
+      "description": "CHEVRON 0098812 FAIRVIEW OR",
+      "amount": -37.51
+    },
+    {
+      "date": "2024-11-11",
+      "description": "SQ *SMITH & SONS, LLC PORTLAND O",
+      "amount": -64
+    },
+    {
+      "date": "2024-11-15",
+      "description": "FRED-MEYER FUEL #0651 GRESHAM OR",
+      "amount": -52.46
+    },
+    {
+      "date": "2024-11-21",
+      "description": "PANDA EXPRESS #1912 GRESHAM OR",
+      "amount": -64.36
+    },
+    {
+      "date": "2024-11-25",
+      "description": "AUTOMATIC PAYMENT - THANK YOU",
+      "amount": 1284.17
+    },
+    {
+      "date": "2024-11-26",
+      "description": "PANDA EXPRESS #1912 GRESHAM OR",
+      "amount": -38.79
+    }
+  ]
+}

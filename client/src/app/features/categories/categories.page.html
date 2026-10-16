@@ -1,0 +1,115 @@
+<div class="page">
+  <div class="page-header">
+    <h1>Categories</h1>
+  </div>
+
+  <form class="add" (ngSubmit)="add()">
+    <mat-form-field appearance="outline" subscriptSizing="dynamic" class="name">
+      <mat-label>New category</mat-label>
+      <input matInput name="newName" [ngModel]="newName()" (ngModelChange)="newName.set($event)" required maxlength="100" data-testid="new-name" />
+    </mat-form-field>
+    <mat-form-field appearance="outline" subscriptSizing="dynamic" class="limit">
+      <mat-label>Monthly budget</mat-label>
+      <span matTextPrefix>$&nbsp;</span>
+      <input matInput type="number" min="0" step="1" name="newLimit" [ngModel]="newLimit()" (ngModelChange)="newLimit.set($event)" />
+    </mat-form-field>
+    <mat-checkbox name="newIncome" [ngModel]="newIncome()" (ngModelChange)="newIncome.set($event)">Income</mat-checkbox>
+    <mat-checkbox
+      name="newTransfer"
+      [ngModel]="newTransfer()"
+      (ngModelChange)="newTransfer.set($event)"
+      matTooltip="Card payments / moves between your accounts: excluded from spending and income"
+      data-testid="new-transfer"
+    >
+      Transfer
+    </mat-checkbox>
+    <button mat-flat-button type="submit" [disabled]="!newName().trim() || creating()" data-testid="add-category">
+      <mat-icon>add</mat-icon> Add
+    </button>
+  </form>
+
+  <div class="table-card">
+    @if (store.loading()) {
+      <mat-progress-bar mode="indeterminate" />
+    }
+    @if (store.loaded() && store.categories().length === 0) {
+      <p class="empty-state">No categories yet. Add one above.</p>
+    } @else {
+      <table class="cats">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Monthly budget</th>
+            <th>Income</th>
+            <th>Transfer</th>
+            <th class="num">Transactions</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (c of store.categories(); track c.id) {
+            <tr data-testid="category-row">
+              <td>
+                <mat-form-field appearance="outline" subscriptSizing="dynamic" class="cell-field">
+                  <input
+                    matInput
+                    #nameInput
+                    [value]="c.name"
+                    (change)="save(c, { name: nameInput.value })"
+                    [attr.aria-label]="'Name of ' + c.name"
+                  />
+                </mat-form-field>
+                @if (c.isAiSuggested) {
+                  <span class="badge badge-ai" matTooltip="Suggested by AI">ai</span>
+                }
+              </td>
+              <td>
+                <mat-form-field appearance="outline" subscriptSizing="dynamic" class="cell-field limit">
+                  <span matTextPrefix>$&nbsp;</span>
+                  <input
+                    matInput
+                    #limitInput
+                    type="number"
+                    min="0"
+                    step="1"
+                    [value]="c.budgetLimit"
+                    [disabled]="c.isIncome || isTransfer(c)"
+                    (change)="save(c, { budgetLimit: +limitInput.value })"
+                    [attr.aria-label]="'Budget for ' + c.name"
+                  />
+                </mat-form-field>
+              </td>
+              <td>
+                <mat-checkbox
+                  [checked]="c.isIncome"
+                  (change)="save(c, { isIncome: $event.checked })"
+                  [attr.aria-label]="c.name + ' is income'"
+                />
+              </td>
+              <td>
+                <mat-checkbox
+                  [checked]="isTransfer(c)"
+                  (change)="save(c, { isTransfer: $event.checked })"
+                  [attr.aria-label]="c.name + ' is a transfer'"
+                  matTooltip="Excluded from spending and income"
+                  data-testid="row-transfer"
+                />
+              </td>
+              <td class="num tabular">{{ c.transactionCount }}</td>
+              <td class="actions">
+                <button
+                  mat-icon-button
+                  (click)="remove(c)"
+                  [matTooltip]="c.transactionCount ? 'In use by ' + c.transactionCount + ' transactions' : 'Delete'"
+                  [attr.aria-label]="'Delete ' + c.name"
+                >
+                  <mat-icon>delete</mat-icon>
+                </button>
+              </td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    }
+  </div>
+</div>

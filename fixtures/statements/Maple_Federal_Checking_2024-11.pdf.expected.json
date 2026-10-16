@@ -1,0 +1,62 @@
+{
+  "account": "Maple Federal Checking",
+  "accountType": "Bank",
+  "periodStart": "2024-11-01",
+  "periodEnd": "2024-11-30",
+  "openingBalance": 4812.37,
+  "closingBalance": 4254.47,
+  "expectReconciliation": "mismatch",
+  "reconciliationNote": "Summary box and Ending Balance line state 4254.47; opening + sum(rows) = 4212.30 (stated is 42.17 higher).",
+  "transactions": [
+    {
+      "date": "2024-11-01",
+      "description": "ACH DEPOSIT BRIGHTLINE LOGISTICS PAYROLL PPD ID: 9100234517",
+      "amount": 2846.15
+    },
+    {
+      "date": "2024-11-01",
+      "description": "ACH DEBIT PINECREST HOME LOANS MTG PYMT PPD ID: 4417730021",
+      "amount": -2385
+    },
+    {
+      "date": "2024-11-02",
+      "description": "DEBIT CARD PURCHASE 11/02 GROCERY OUTLET #388 GRESHAM OR",
+      "amount": -53.22
+    },
+    {
+      "date": "2024-11-04",
+      "description": "ATM WITHDRAWAL 11/02 MAPLE FEDERAL ATM #2210 2210 MAIN ST FAIRVIEW OR",
+      "amount": -100
+    },
+    {
+      "date": "2024-11-04",
+      "description": "POS DEBIT 11/03 SAFEWAY #1544 FAIRVIEW OR",
+      "amount": -164.46
+    },
+    {
+      "date": "2024-11-05",
+      "description": "ONLINE TRANSFER TO MAPLE FEDERAL SAVINGS XXXXXX4471 REF #IBFK8XWKD",
+      "amount": -500
+    },
+    {
+      "date": "2024-11-08",
+      "description": "ACH DEBIT CASCADE POWER & LIGHT ONLINE PMT WEB ID: 9300012231",
+      "amount": -127.43
+    },
+    {
+      "date": "2024-11-13",
+      "description": "DEBIT CARD PURCHASE 11/13 GOODWILL #22 GRESHAM OR",
+      "amount": -14.5
+    },
+    {
+      "date": "2024-11-19",
+      "description": "POS DEBIT 11/19 GROCERY OUTLET #388 GRESHAM OR",
+      "amount": -70.97
+    },
+    {
+      "date": "2024-11-25",
+      "description": "DEBIT CARD PURCHASE 11/24 WALGREENS #06124 FAIRVIEW OR",
+      "amount": -30.64
+    }
+  ]
+}

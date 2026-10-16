@@ -39,6 +39,7 @@ If you change a route, payload, or table, update this file in the same change.
 | `DB_NAME_TEST` | `localaibudget_test` | used by e2e tests; created/migrated automatically by test setup |
 | `OLLAMA_HOST` | `http://127.0.0.1:11434` | |
 | `OLLAMA_MODEL` | `gemma4` | |
+| `OLLAMA_TIMEOUT_MS` | `180000` | per LLM call; timeout → batch retried once, then rows left for review (job continues); insights → 504 |
 | `STATEMENTS_DIR` | `<repo>/data/statements` | |
 | `PORT` | `3000` | |
 
@@ -236,3 +237,103 @@ Selected month lives in a shared signal service and is reflected in the URL quer
    inline category `mat-select` per row (PATCH), "Split" action opens dialog (rows of category+amount, live remaining
    balance, validation mirrors server), badges for `manual` / `ai` / split.
 4. **Categories** `/categories` — editable table of name / budget limit / income flag; add & delete (show 409 nicely).
+
+---
+
+## MVP additions (approved 2026-10-16) — these extend/override the sections above
+
+### A. OFX / QFX import
+- Upload + discovery accept `.ofx` / `.qfx` (`file_type` `'ofx'|'qfx'`, `last_parse_method` `'ofx'`). Preference order for
+  same-basename files: **OFX/QFX > CSV > PDF > TXT**.
+- Support OFX 1.x (SGML, unclosed tags) and 2.x (XML). Read `<STMTTRN>` (`DTPOSTED`, `TRNAMT`, `NAME`/`MEMO`, `FITID`),
+  `<LEDGERBAL>`, `<DTSTART>/<DTEND>`. `TRNAMT` sign is already "negative = money out" for both bank and card.
+- Dedupe for OFX rows: `dedupe_key = sha256(account_id | 'fitid' | FITID)`.
+
+### B. Category rules (learned from corrections)
+```sql
+category_rules(
+  id serial PK, pattern text NOT NULL, match_type varchar(16) NOT NULL DEFAULT 'contains', -- 'contains'|'starts_with'|'regex'
+  category_id int NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
+  priority int NOT NULL DEFAULT 0, hits int NOT NULL DEFAULT 0, created_at timestamptz DEFAULT now(),
+  UNIQUE(pattern, match_type)
+)
+```
+- Matching is against the **normalized description** (uppercase, collapse whitespace). Highest priority, then longest pattern wins.
+- Processing order for each non-manual, non-split row: **rules → transfer matching → Gemma**. `categorized_by` gains `'rule'` and `'transfer'`.
+  In `recategorize` mode rules are re-applied too. Manual corrections still win over everything.
+- `GET /api/rules` → `{ id, pattern, matchType, categoryId, categoryName, priority, hits }[]`
+- `POST /api/rules` `{ pattern, matchType?, categoryId, priority?, applyToExisting?: boolean }` → Rule (+ `appliedCount` when applyToExisting)
+- `PATCH /api/rules/:id`, `DELETE /api/rules/:id` → 204
+- `POST /api/rules/preview` `{ pattern, matchType }` → `{ matchCount, sample: Transaction[] (≤10) }`
+- `GET /api/rules/suggest?transactionId=` → `{ pattern, matchType, matchCount }` — merchant key derived by stripping
+  prefixes (`POS DEBIT`, `SQ *`, `TST*`, `ACH`, dates), trailing store numbers / ref ids / city+state (e.g. `AMZN Mktp US*2K4L91` → `AMZN MKTP`).
+- UX: after a category correction (PATCH), the client calls suggest and shows a snackbar
+  "Always categorize **AMZN MKTP** as Shopping? (12 matching)" → creates rule with `applyToExisting: true`. A Rules page lists/edits rules.
+
+### C. Statement reconciliation
+- `statement_files` gains: `period_start date, period_end date, opening_balance numeric(12,2), closing_balance numeric(12,2),
+  parsed_total numeric(12,2), reconciliation_status varchar(16) DEFAULT 'unknown'` (`'ok'|'mismatch'|'unknown'`), `reconciliation_diff numeric(12,2)`.
+- Parsers return optional statement metadata (period, opening/closing balance). PDF: from the summary box (regex first, LLM fallback in the
+  same extraction call). CSV with a Balance column: derive from first/last rows. OFX: `LEDGERBAL` + period.
+- Check: **bank**: `opening + Σ amounts = closing`. **card** (balances are amounts owed): `opening_owed − Σ normalized amounts = closing_owed`.
+  Tolerance 0.01. No balances found → `unknown`.
+- `StatementFile` gains `periodStart, periodEnd, openingBalance, closingBalance, parsedTotal, reconciliationStatus, reconciliationDiff`.
+- Job `errors` include a mismatch entry per file; `MonthSummary` gains `reconciliationIssues: number`.
+- UI: badge per file on Process page (✓ / ⚠ "Off by $X — rows may be missing" / ?), dashboard warning when any file in month mismatches.
+
+### D. Transfer matching across accounts
+- `transactions.transfer_pair_id int REFERENCES transactions(id) ON DELETE SET NULL`.
+- After import (and in recategorize), pair rows where: different accounts, `a.amount = -b.amount`, dates within 5 days, both unpaired,
+  and at least one looks like a payment/transfer (description matches `PAYMENT|TRANSFER|XFER|AUTOPAY|ONLINE PMT|EPAY` or category Transfer).
+  Prefer closest date. Paired rows → category `Transfer`, `categorized_by='transfer'` (unless manual).
+- Card payments / transfer-looking rows left unpaired get `needs_review=true` (see E).
+- `Transaction` gains `transferPairId` (+ `transferPairAccountName`). Job gains `transfersMatched`, `rulesApplied`.
+- Budget summary/trend exclude `Transfer` from spending and income.
+
+### E. Review queue (confidence)
+- `transactions` gains `ai_confidence numeric(3,2)`, `needs_review boolean NOT NULL DEFAULT false`.
+- Gemma categorization returns `{ category, confidence 0..1 }` per row. `needs_review = true` when confidence < 0.7, category fell back
+  to `Other`, or unpaired transfer-looking row (D). Rule/manual/transfer-categorized rows → false.
+- `GET /api/transactions?needsReview=true`; `Transaction` gains `aiConfidence, needsReview`.
+- `PATCH /api/transactions/:id` also accepts `{ reviewed: true }` (clears flag without changing category); any category correction clears it.
+- `POST /api/transactions/review` `{ ids: number[] }` → `{ updated }` (bulk "looks good").
+- `MonthSummary` gains `needsReviewCount`. UI: "Needs review (N)" chip/filter on Transactions, count on dashboard, bulk approve.
+
+### F. Contract clarifications (resolved after frontend build)
+1. `percentUsed` is on a **0–100** scale (`spent / budgetLimit * 100`, rounded to 1 decimal); `budgetLimit = 0` → `null`.
+2. Categories gain `is_transfer boolean DEFAULT false` (seed `Transfer` with true). `Category` and budget-summary category rows
+   expose `isTransfer`. Transfer categories are excluded from spending, income, and trend; clients must use the flag, not the name.
+3. Upload `month` field applies only to files whose names don't contain `YYYY-MM`; a month in the filename wins.
+4. `PATCH /api/rules/:id` accepts a partial of `{ pattern, matchType, categoryId, priority }`.
+5. `GET /api/transactions` with `uncategorized=true` ignores `categoryId`.
+
+### G. Backend implementation notes (server agent, 2026-10-16) — additive, binding
+1. **Budget math.** Totals: `totalIncome = Σ positive amounts`, `totalSpent = −Σ negative amounts`, `net = totalIncome − totalSpent`,
+   all over non-transfer categories + uncategorized (refunds in a spending category therefore count as income).
+   Category rows: spending `spent = −Σ negative`, income `spent = Σ positive`. Order: spending (spent desc), income, then
+   transfer rows (`isTransfer: true`, `spent` = money moved out, informational only). `remaining = budgetLimit − spent`.
+2. **Trend.** `GET /api/budget/trend?months=6[&month=YYYY-MM]` returns exactly `months` (1–24) calendar months ending at `month`
+   (default: latest month that has transactions), oldest first, zero-filled. `byCategory` = spending categories with `spent > 0`.
+3. **Process month scope.** Categorization covers rows with `statement_month = month` **or** `transaction_date` in the month.
+4. **Parser chain** (first strategy that returns rows wins): OFX/QFX → CSV → legacy `YYYY-MM-DD` regex → running-balance bank table
+   (sign from balance delta, seeded by "Beginning Balance") → two-date card table (Trans Date, Post Date) → Gemma page-by-page
+   extraction. All fixtures in `fixtures/statements/` parse deterministically (no LLM).
+5. **Account type from name:** `Credit Card` if the name contains card/visa/mastercard/amex/american express/discover, else `Bank`.
+6. **Review flag nuance:** an unpaired transfer-looking row gets `needs_review` only when Gemma also labels it a transfer category
+   (utilities like "… ONLINE PMT"/"… AUTOPAY" and "INTEREST PAYMENT" are not flagged just for the keyword).
+7. **Few-shot examples** = up to 20 most recent manual corrections without splits (distinct descriptions).
+8. **Additive response fields:** `StatementFile.accountType`; `Job.rulesApplied`, `Job.transfersMatched`.
+9. **Status codes:** upload file > 20MB → 413; `POST /api/insights/generate` → 201, 503 if Ollama unreachable, 502 if the model's
+   answer is unusable; `GET /api/insights` sends a literal JSON `null` when none. `POST /api/rules/preview` and
+   `POST /api/transactions/review` → 200. `PATCH /api/transactions/:id` accepts `{ categoryId?: number|null, reviewed?: true }`
+   (at least one; `categoryId: null` = manual "uncategorized").
+10. **Migration 001 on the legacy DB** merges duplicate `accounts` rows (same name → lowest id, references re-pointed) before adding
+    the UNIQUE constraint. Migration 002 holds the MVP additions (B–E).
+11. **Server binds to 127.0.0.1 only.**
+12. **Job progress units** = files + rows sent to Gemma. `total` starts as the file count with `processed = 0`; after import it
+    becomes files + rows-to-categorize and `processed` jumps to the file count, so `processed/total` is monotonic and ≤ 1.
+13. **LLM failures:** connection refused / model missing → job `failed` (insights 503). Timeout (`OLLAMA_TIMEOUT_MS`) → the
+    categorize batch is retried once; on a second timeout its rows stay as they were (uncategorized in incremental mode) with
+    `needs_review = true` and a job error is recorded; the job still completes. Insights timeout → 504.
+14. **Rules `applyToExisting`** only touches rows where the new rule is the winning rule (priority, then longest pattern) and
+    skips manual, split and transfer-paired rows.

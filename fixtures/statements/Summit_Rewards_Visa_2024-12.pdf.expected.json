@@ -1,0 +1,91 @@
+{
+  "account": "Summit Rewards Visa",
+  "accountType": "Credit Card",
+  "periodStart": "2024-12-05",
+  "periodEnd": "2025-01-04",
+  "openingBalance": 5528.28,
+  "closingBalance": 4924.65,
+  "expectReconciliation": "ok",
+  "transactions": [
+    {
+      "date": "2024-12-03",
+      "description": "SQ *LITTLE STARS DANCE ACADEMY FAIRVIEW OR",
+      "amount": -95
+    },
+    {
+      "date": "2024-12-03",
+      "description": "SQ *CASCADE ROASTERS FAIRVIEW OR",
+      "amount": -8.13
+    },
+    {
+      "date": "2024-12-04",
+      "description": "TST* PINE STATE BISCUITS PORTLAND OR",
+      "amount": -89.66
+    },
+    {
+      "date": "2024-12-09",
+      "description": "SPOTIFY USA 877-778-1161 NY",
+      "amount": -16.99
+    },
+    {
+      "date": "2024-12-09",
+      "description": "AMZN Mktp US*G4BKDT Amzn.com/bill WA",
+      "amount": -61.46
+    },
+    {
+      "date": "2024-12-10",
+      "description": "STARBUCKS STORE 05521 GRESHAM OR",
+      "amount": -8.47
+    },
+    {
+      "date": "2024-12-16",
+      "description": "ALASKA AIR 0277142903318 SEATTLE WA PASSENGER: RIVERA/JORDAN M",
+      "amount": -412.6
+    },
+    {
+      "date": "2024-12-18",
+      "description": "SQ *TACO PEDRO GRESHAM OR",
+      "amount": -63.91
+    },
+    {
+      "date": "2024-12-23",
+      "description": "PAYMENT THANK YOU - WEB",
+      "amount": 1850
+    },
+    {
+      "date": "2024-12-27",
+      "description": "AMZN Mktp US*HNHUYN Amzn.com/bill WA",
+      "amount": -49.42
+    },
+    {
+      "date": "2024-12-28",
+      "description": "WHISTLER BLACKCOMB GUEST SVCS WHISTLER BC",
+      "amount": -186.4
+    },
+    {
+      "date": "2024-12-28",
+      "description": "FOREIGN TRANSACTION FEE",
+      "amount": -5.59
+    },
+    {
+      "date": "2024-12-30",
+      "description": "AMZN Mktp US*RT4QL2 RETURN Amzn.com/bill WA",
+      "amount": 34.99
+    },
+    {
+      "date": "2025-01-01",
+      "description": "PIZZICATO #14 PORTLAND OR",
+      "amount": -56.75
+    },
+    {
+      "date": "2025-01-02",
+      "description": "OLIVE GARDEN 0012345 GRESHAM OR",
+      "amount": -86.02
+    },
+    {
+      "date": "2025-01-04",
+      "description": "PURCHASE INTEREST CHARGE",
+      "amount": -140.96
+    }
+  ]
+}

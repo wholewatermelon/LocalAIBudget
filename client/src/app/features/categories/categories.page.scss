@@ -1,0 +1,53 @@
+.add {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+
+  .name {
+    flex: 1 1 220px;
+  }
+  .limit {
+    width: 160px;
+  }
+}
+
+.table-card {
+  border: 1px solid var(--mat-sys-outline-variant);
+  border-radius: 12px;
+  overflow-x: auto;
+}
+
+.cats {
+  width: 100%;
+  border-collapse: collapse;
+
+  th,
+  td {
+    text-align: left;
+    padding: 6px 12px;
+    border-bottom: 1px solid var(--mat-sys-outline-variant);
+  }
+  th {
+    font: var(--mat-sys-label-medium);
+    color: var(--mat-sys-on-surface-variant);
+  }
+  .num {
+    text-align: right;
+  }
+  .actions {
+    width: 48px;
+  }
+}
+
+.cell-field {
+  width: 200px;
+  --mat-form-field-container-height: 36px;
+  --mat-form-field-container-vertical-padding: 6px;
+  margin-right: 8px;
+
+  &.limit {
+    width: 140px;
+  }
+}

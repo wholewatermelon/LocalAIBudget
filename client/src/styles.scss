@@ -1,0 +1,133 @@
+@use '@angular/material' as mat;
+
+// Material 3 theme. `color-scheme: light dark` + mat.theme() emit light-dark() tokens,
+// so the whole app follows the OS prefers-color-scheme setting automatically.
+html {
+  color-scheme: light dark;
+  @include mat.theme((
+    color: (
+      primary: mat.$azure-palette,
+      tertiary: mat.$blue-palette,
+    ),
+    typography: (
+      plain-family: 'Roboto, system-ui, -apple-system, "Segoe UI", sans-serif',
+      brand-family: 'Roboto, system-ui, -apple-system, "Segoe UI", sans-serif',
+    ),
+    density: 0,
+  ));
+
+  // App-level tokens (status palette is fixed; never reused for chart series).
+  --app-good: #0ca30c;
+  --app-warning: #fab219;
+  --app-critical: #d03b3b;
+  --app-muted: #898781;
+  --app-grid: light-dark(#e1e0d9, #2c2c2a);
+  --app-axis: light-dark(#c3c2b7, #383835);
+
+  // Categorical chart series (validated reference palette, fixed order).
+  --series-1: light-dark(#2a78d6, #3987e5);
+  --series-2: light-dark(#eb6834, #d95926);
+  --series-3: light-dark(#1baf7a, #199e70);
+  --series-4: light-dark(#eda100, #c98500);
+  --series-5: light-dark(#e87ba4, #d55181);
+  --series-6: light-dark(#008300, #008300);
+  --series-7: light-dark(#6250d6, #9085e9);
+  --series-8: light-dark(#e34948, #e66767);
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--mat-sys-surface);
+  color: var(--mat-sys-on-surface);
+  font: var(--mat-sys-body-medium);
+}
+
+.page {
+  padding: 16px;
+  max-width: 1200px;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
+.page-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+
+  h1 {
+    font: var(--mat-sys-headline-small);
+    margin: 0;
+    flex: 1 1 auto;
+  }
+}
+
+.empty-state {
+  padding: 32px 16px;
+  text-align: center;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.loading-state {
+  display: flex;
+  justify-content: center;
+  padding: 32px;
+}
+
+.badge {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 10px;
+  font: var(--mat-sys-label-small);
+  background: var(--mat-sys-surface-container-high);
+  color: var(--mat-sys-on-surface-variant);
+  white-space: nowrap;
+
+  &.badge-ai {
+    background: var(--mat-sys-tertiary-container);
+    color: var(--mat-sys-on-tertiary-container);
+  }
+  &.badge-manual {
+    background: var(--mat-sys-secondary-container);
+    color: var(--mat-sys-on-secondary-container);
+  }
+  &.badge-split {
+    background: var(--mat-sys-primary-container);
+    color: var(--mat-sys-on-primary-container);
+  }
+}
+
+.money-neg {
+  color: var(--mat-sys-on-surface);
+}
+.money-pos {
+  color: light-dark(#006300, #0ca30c);
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+.error-snackbar {
+  --mat-snack-bar-container-color: var(--mat-sys-error-container);
+  --mat-snack-bar-supporting-text-color: var(--mat-sys-on-error-container);
+}
+
+.pre-tooltip {
+  white-space: pre-line;
+}
+
+.badge.badge-rule {
+  background: light-dark(#d9f2e6, #12392a);
+  color: light-dark(#0b4d33, #a7e3c6);
+}
+.badge.badge-transfer {
+  background: var(--mat-sys-surface-container-highest);
+  color: var(--mat-sys-on-surface);
+}

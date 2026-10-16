@@ -7,7 +7,8 @@
     "install:all": "npm install && npm --prefix server install && npm --prefix client install",
     "migrate": "npm --prefix server run migrate",
     "test": "npm --prefix server test && npm --prefix server run test:e2e && npm --prefix client test -- --watch=false",
-    "generate:fake": "node scripts/generate-fake-statements.js"
+    "generate:fake": "node scripts/generate-fake-statements.js",
+    "generate:fixtures": "node scripts/generate-fake-statements.js --fixtures"
   },
   "repository": {
     "type": "git",

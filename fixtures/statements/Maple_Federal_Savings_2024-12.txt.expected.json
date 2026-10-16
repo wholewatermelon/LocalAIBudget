@@ -1,0 +1,24 @@
+{
+  "account": "Maple Federal Savings",
+  "accountType": "Bank",
+  "periodStart": "2024-12-01",
+  "periodEnd": "2024-12-31",
+  "expectReconciliation": "unknown",
+  "transactions": [
+    {
+      "date": "2024-12-06",
+      "description": "ONLINE TRANSFER FROM MAPLE FEDERAL CHECKING XXXXXX2290",
+      "amount": 500
+    },
+    {
+      "date": "2024-12-18",
+      "description": "ONLINE TRANSFER TO MAPLE FEDERAL CHECKING XXXXXX2290 HOLIDAY",
+      "amount": -300
+    },
+    {
+      "date": "2024-12-31",
+      "description": "INTEREST PAYMENT",
+      "amount": 6.12
+    }
+  ]
+}

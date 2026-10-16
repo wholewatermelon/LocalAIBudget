@@ -1,0 +1,99 @@
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+
+  mat-form-field {
+    width: 200px;
+  }
+  .search {
+    flex: 1 1 240px;
+  }
+}
+
+.table-card {
+  border: 1px solid var(--mat-sys-outline-variant);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.table-scroll {
+  overflow-x: auto;
+  max-height: calc(100vh - 260px);
+}
+
+table {
+  width: 100%;
+}
+
+.nowrap {
+  white-space: nowrap;
+}
+
+.desc {
+  min-width: 200px;
+}
+
+.num {
+  text-align: right;
+}
+
+.cat-cell {
+  min-width: 180px;
+}
+
+.inline-select {
+  width: 180px;
+  --mat-form-field-container-height: 36px;
+  --mat-form-field-container-vertical-padding: 6px;
+  font-size: 14px;
+}
+
+.split-summary {
+  text-decoration: underline dotted;
+  cursor: help;
+}
+
+.badge + .badge {
+  margin-left: 4px;
+}
+
+.bulk-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  border-radius: 12px;
+  background: var(--mat-sys-secondary-container);
+  color: var(--mat-sys-on-secondary-container);
+}
+
+.select-cell {
+  width: 48px;
+}
+
+.pair {
+  font: var(--mat-sys-body-small);
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.confidence {
+  margin-left: 4px;
+  font: var(--mat-sys-label-small);
+  color: var(--mat-sys-on-surface-variant);
+
+  &.low {
+    color: var(--mat-sys-error);
+  }
+}
+
+tr.needs-review td:first-child {
+  box-shadow: inset 3px 0 0 var(--app-warning);
+}
+
+.review-btn {
+  color: var(--app-good);
+}
