@@ -22,6 +22,8 @@ export interface AppConfig {
   ollamaModel: string;
   /** Per-call LLM timeout (OLLAMA_TIMEOUT_MS). */
   ollamaTimeoutMs: number;
+  /** How long Ollama keeps the model loaded after a call (OLLAMA_KEEP_ALIVE, Ollama duration syntax). */
+  ollamaKeepAlive: string;
   statementsDir: string;
 }
 
@@ -46,6 +48,7 @@ export function buildConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
       Number(env.OLLAMA_TIMEOUT_MS) > 0
         ? Number(env.OLLAMA_TIMEOUT_MS)
         : 180000,
+    ollamaKeepAlive: env.OLLAMA_KEEP_ALIVE ?? '60m',
     statementsDir,
   };
 }

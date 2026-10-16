@@ -15,6 +15,8 @@ import { OllamaLlmClient } from './ollama-llm.client';
           cfg.ollamaHost,
           cfg.ollamaModel,
           cfg.ollamaTimeoutMs,
+          undefined,
+          cfg.ollamaKeepAlive,
         ),
     },
   ],

@@ -24,6 +24,7 @@ From the repo root `npm run dev` starts server + client. The server binds to **1
 | `DB_PASSWORD` | required |
 | `DB_NAME` / `DB_NAME_TEST` | `localaibudget` / `localaibudget_test` |
 | `OLLAMA_HOST` / `OLLAMA_MODEL` | `http://127.0.0.1:11434` / `gemma4` |
+| `OLLAMA_KEEP_ALIVE` | `60m` — passed as `keep_alive` on every Ollama call so the model stays loaded between batches/demos |
 | `OLLAMA_TIMEOUT_MS` | `180000` — per LLM call (AbortSignal.timeout). Timeout ≠ unavailable: a categorize batch is retried once, then its rows are left for review; insights return 504 |
 | `STATEMENTS_DIR` | `<repo>/data/statements` (relative paths resolve against the repo root) |
 | `PORT` | `3000` |

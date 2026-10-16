@@ -39,6 +39,7 @@ If you change a route, payload, or table, update this file in the same change.
 | `DB_NAME_TEST` | `localaibudget_test` | used by e2e tests; created/migrated automatically by test setup |
 | `OLLAMA_HOST` | `http://127.0.0.1:11434` | |
 | `OLLAMA_MODEL` | `gemma4` | |
+| `OLLAMA_KEEP_ALIVE` | `60m` | how long Ollama keeps the model loaded after each call (avoids a slow cold reload) |
 | `OLLAMA_TIMEOUT_MS` | `180000` | per LLM call; timeout → batch retried once, then rows left for review (job continues); insights → 504 |
 | `STATEMENTS_DIR` | `<repo>/data/statements` | |
 | `PORT` | `3000` | |

@@ -28,6 +28,7 @@ export class OllamaLlmClient implements LlmClient {
     readonly model: string,
     private readonly timeoutMs = DEFAULT_OLLAMA_TIMEOUT_MS,
     baseFetch: FetchFn = fetch,
+    private readonly keepAlive = '60m',
   ) {
     this.ollama = new Ollama({
       host,
@@ -51,6 +52,7 @@ export class OllamaLlmClient implements LlmClient {
         think: false,
         stream: false,
         options: { temperature: 0 },
+        keep_alive: this.keepAlive,
       });
       text = res.response ?? '';
     } catch (err) {
