@@ -59,6 +59,10 @@ One fictional household, four accounts at fictional institutions, in the formats
 card CSV and QFX, and an old-style TXT. `fixtures/statements/` holds one small file per layout plus an `.expected.json`
 with the exact sign-normalized transactions a parser must produce — see `fixtures/statements/README.md`.
 
+### Demo
+A 5-minute scripted demo (6 months of history, live upload, rules, reconciliation, budgets, insights) lives in
+[`docs/DEMO.md`](docs/DEMO.md). `npm run demo:reset` puts the app into the staged state in seconds, fully offline.
+
 ## Tests
 ```bash
 npm test   # server unit + e2e (uses a separate localaibudget_test DB), then client unit tests
@@ -72,3 +76,6 @@ npm test   # server unit + e2e (uses a separate localaibudget_test DB), then cli
 | `docs/` | Architecture/API contract and roadmap |
 | `scripts/` | Data generators; `scripts/legacy/` holds the original CLI prototype |
 | `CLAUDE.md` | Guide for AI coding agents working in this repo |
+
+## License
+[MIT](LICENSE)

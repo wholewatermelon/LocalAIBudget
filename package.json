@@ -8,7 +8,9 @@
     "migrate": "npm --prefix server run migrate",
     "test": "npm --prefix server test && npm --prefix server run test:e2e && npm --prefix client test -- --watch=false",
     "generate:fake": "node scripts/generate-fake-statements.js",
-    "generate:fixtures": "node scripts/generate-fake-statements.js --fixtures"
+    "generate:fixtures": "node scripts/generate-fake-statements.js --fixtures",
+    "demo:prepare": "node scripts/demo-prepare.js",
+    "demo:reset": "node scripts/demo-reset.js"
   },
   "repository": {
     "type": "git",
@@ -16,7 +18,7 @@
   },
   "keywords": [],
   "author": "",
-  "license": "ISC",
+  "license": "MIT",
   "bugs": {
     "url": "https://github.com/wholewatermelon/LocalAIBudget/issues"
   },

@@ -236,7 +236,7 @@ export class TransactionsPage implements AfterViewInit {
         filter((s) => !!s?.pattern),
         switchMap((s) =>
           this.notify
-            .action(
+            .prompt(
               `Always categorize ${s.pattern} as ${categoryName}? (${s.matchCount} matching)`,
               'Create rule',
             )
@@ -249,7 +249,7 @@ export class TransactionsPage implements AfterViewInit {
       .subscribe({
         next: (rule) => {
           const n = rule.appliedCount ?? 0;
-          this.notify.info(`Rule created — ${n} transaction${n === 1 ? '' : 's'} updated`);
+          this.notify.info(`Rule created — ${n} transaction${n === 1 ? '' : 's'} updated`, 6000);
           this.reloadTick.update((t) => t + 1);
           this.countsChanged(true);
         },

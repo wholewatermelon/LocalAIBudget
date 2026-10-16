@@ -12,6 +12,7 @@ import {
 } from './categorizer.service';
 import { computeDedupeKeys, normalizeForMatch } from './dedupe';
 import { findTransferPairs, looksLikeTransfer } from './transfers';
+import { completionMessage, JobCounters } from './processing.service';
 
 const row = (
   date: string,
@@ -307,6 +308,47 @@ describe('transfer matching', () => {
     ).toEqual([[1, 2]]);
     expect(looksLikeTransfer({ description: 'HARBOR CARD AUTOPAY' })).toBe(
       true,
+    );
+  });
+});
+
+describe('job completion message', () => {
+  const counters = (over: Partial<JobCounters>): JobCounters => ({
+    total: 0,
+    processed: 0,
+    inserted: 0,
+    skippedDuplicates: 0,
+    categorized: 0,
+    rulesApplied: 0,
+    transfersMatched: 0,
+    errors: [],
+    ...over,
+  });
+
+  it('breaks down how rows were categorized', () => {
+    expect(
+      completionMessage(
+        1,
+        counters({ inserted: 13, rulesApplied: 8, transfersMatched: 1 }),
+        {
+          aiCategorized: 4,
+          leftForReview: 0,
+        },
+      ),
+    ).toBe(
+      'Processed 1 file: 13 new rows — 8 by rules, 1 transfer pair, 4 by Gemma (0 duplicates skipped)',
+    );
+    expect(
+      completionMessage(
+        2,
+        counters({ inserted: 1, skippedDuplicates: 1, transfersMatched: 2 }),
+        {
+          aiCategorized: 0,
+          leftForReview: 20,
+        },
+      ),
+    ).toBe(
+      'Processed 2 files: 1 new row — 0 by rules, 2 transfer pairs, 0 by Gemma, 20 left for review (LLM timeout) (1 duplicate skipped)',
     );
   });
 });

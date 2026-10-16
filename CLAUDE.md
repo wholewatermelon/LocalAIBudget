@@ -10,7 +10,8 @@ keep it in sync with any route/payload/table change. Progress tracking lives in 
 - `server/` — NestJS API (port 3000). Raw SQL with `pg`, migrations in `server/db/migrations/`.
 - `client/` — Angular app (port 4200), proxies `/api` → `127.0.0.1:3000` (server binds IPv4 loopback only).
 - `data/statements/YYYY-MM/` — statement files (gitignored).
-- `scripts/generate-fake-statements.js` — realistic synthetic statements, 2024-11..2025-01 (PDF/CSV/OFX/QFX/TXT; run from repo root; `--out <dir>`, `--fixtures`).
+- `scripts/generate-fake-statements.js` — realistic synthetic statements, 2024-11..2025-01 (PDF/CSV/OFX/QFX/TXT; run from repo root; `--out <dir>`, `--from/--to YYYY-MM`, `--fixtures`, `--demo`).
+- `demo/` + `scripts/demo-*.js` — reproducible demo: `npm run demo:reset` restores `demo/snapshot.sql` (~seconds, offline), `npm run demo:prepare` rebuilds it (~30 min, real Gemma). Talk track: `docs/DEMO.md`.
 - `fixtures/statements/` — committed parser fixtures, one per layout, each with `<file>.expected.json`; see its README.md. `scripts/inspect-pdf.js <pdf>` prints what pdf-parse extracts.
 - `scripts/legacy/` — original CLI prototype, reference only.
 
@@ -27,6 +28,7 @@ Root (`package.json`):
 - `npm run dev` — server + client together
 - `npm test` — server unit + e2e, then client unit tests
 - `npm run generate:fake` — regenerate synthetic statements
+- `npm run demo:reset` / `npm run demo:prepare` — demo state (overwrites the dev DB and data/statements)
 
 Server (`cd server`): `npm run start:dev`, `npm run migrate`, `npm test` (unit), `npm run test:e2e`
 (uses `localaibudget_test` DB, created + migrated automatically), `npm run db:reset` (wipes DEV data; fine to use — data is disposable).

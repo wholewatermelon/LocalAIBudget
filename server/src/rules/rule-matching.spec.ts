@@ -49,5 +49,13 @@ describe('deriveMerchantKey', () => {
     ['POS DEBIT 11/30 CHEVRON 0098812 FAIRVIEW OR', 'CHEVRON'],
     ['STARBUCKS STORE 05521 GRESHAM OR', 'STARBUCKS STORE'],
     ['Netflix Subscription', 'NETFLIX SUBSCRIPTION'],
+    ['SQ *BLUE BOTTLE COFFEE SAN FRANCISCO CA', 'BLUE BOTTLE COFFEE'],
+    ['BLUE BOTTLE COFFEE SAN FRANCISCO CA', 'BLUE BOTTLE COFFEE'],
+    ['IN-N-OUT BURGER LOS ANGELES CA', 'IN-N-OUT BURGER'],
+    ['JOES PIZZA NEW YORK NY', 'JOES PIZZA'],
+    ['BLUE BOTTLE COFFEE OAKLAND CA', 'BLUE BOTTLE COFFEE'],
+    ['TARGET CA', 'TARGET'],
+    ['SAN FRANCISCO CA', 'SAN'], // never strips the whole description
+    ['SPOTIFY', 'SPOTIFY'],
   ])('%s → %s', (desc, key) => expect(deriveMerchantKey(desc)).toBe(key));
 });

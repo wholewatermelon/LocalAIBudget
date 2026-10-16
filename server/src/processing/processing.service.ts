@@ -45,6 +45,31 @@ export interface ProgressSink {
 
 const MAX_ISSUES_PER_FILE = 20;
 
+export interface CategorizeOutcome {
+  /** Rows categorized by Gemma in this run (counted explicitly, not derived). */
+  aiCategorized: number;
+  /** Rows left uncategorized for review after repeated LLM timeouts. */
+  leftForReview: number;
+}
+
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+
+/** e.g. "Processed 1 file: 13 new rows — 8 by rules, 1 transfer pair, 4 by Gemma (0 duplicates skipped)" */
+export function completionMessage(
+  files: number,
+  c: JobCounters,
+  o: CategorizeOutcome,
+): string {
+  const review = o.leftForReview
+    ? `, ${o.leftForReview} left for review (LLM timeout)`
+    : '';
+  return (
+    `Processed ${plural(files, 'file')}: ${plural(c.inserted, 'new row')} — ${c.rulesApplied} by rules, ` +
+    `${plural(c.transfersMatched, 'transfer pair')}, ${o.aiCategorized} by Gemma${review} ` +
+    `(${plural(c.skippedDuplicates, 'duplicate')} skipped)`
+  );
+}
+
 /**
  * The month pipeline: import files (parse → sign-normalize → dedupe insert → reconcile), then categorize every
  * eligible row with rules → transfer matching → Gemma. Manual corrections and split rows are never touched.
@@ -84,11 +109,8 @@ export class ProcessingService {
       await sink.flush();
     }
 
-    await this.categorizeMonth(month, mode, sink, files.length);
-    return (
-      `Processed ${files.length} file(s): ${c.inserted} inserted, ${c.skippedDuplicates} duplicates skipped, ` +
-      `${c.categorized} categorized (${c.rulesApplied} by rules, ${c.transfersMatched} transfer pairs)`
-    );
+    const outcome = await this.categorizeMonth(month, mode, sink, files.length);
+    return completionMessage(files.length, c, outcome);
   }
 
   private async importFile(file: StatementFile, c: JobCounters): Promise<void> {
@@ -170,7 +192,8 @@ export class ProcessingService {
     mode: ProcessMode,
     sink: ProgressSink,
     importedFiles = 0,
-  ): Promise<void> {
+  ): Promise<CategorizeOutcome> {
+    const outcome: CategorizeOutcome = { aiCategorized: 0, leftForReview: 0 };
     const c = sink.counters;
     const scope = this.scopeSql(month);
     const targets = await this.db.query<{
@@ -238,7 +261,7 @@ export class ProcessingService {
     c.total = importedFiles + remaining.length;
     c.processed = importedFiles;
     await sink.flush();
-    if (!remaining.length) return;
+    if (!remaining.length) return outcome;
     const examples = await this.recentCorrections();
     const transferLooking = new Set(
       remaining.filter((t) => TRANSFER_RE.test(t.description)).map((t) => t.id),
@@ -278,7 +301,10 @@ export class ProcessingService {
               needsReview,
             ],
           );
-          if (updated.length) c.categorized++;
+          if (updated.length) {
+            c.categorized++;
+            outcome.aiCategorized++;
+          }
         }
         c.processed += results.size;
         await sink.flush();
@@ -293,10 +319,12 @@ export class ProcessingService {
         c.errors.push({
           message: `Categorization timed out twice for ${batch.length} row(s); they were left for review. ${err.message}`,
         });
+        outcome.leftForReview += batch.length;
         c.processed += batch.length;
         await sink.flush();
       },
     );
+    return outcome;
   }
 
   /**

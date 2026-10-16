@@ -33,7 +33,17 @@ import { Job } from '../../core/models';
       }
     }
     @if (j.message) {
-      <p class="message" [class.error]="j.status === 'failed'">{{ j.message }}</p>
+      <p
+        class="message"
+        [class.error]="j.status === 'failed'"
+        [class.done]="j.status === 'completed'"
+        data-testid="job-message"
+      >
+        @if (j.status === 'completed') {
+          <mat-icon>task_alt</mat-icon>
+        }
+        {{ j.message }}
+      </p>
     }
     <div class="counts" data-testid="job-counts">
       <span><strong>{{ j.inserted }}</strong> inserted</span>
@@ -78,6 +88,22 @@ import { Job } from '../../core/models';
     }
     .status.failed {
       color: var(--mat-sys-error);
+    }
+    .message {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 8px 0;
+    }
+    .message.done {
+      font: var(--mat-sys-title-medium);
+      padding: 8px 12px;
+      border-radius: 8px;
+      background: var(--mat-sys-primary-container);
+      color: var(--mat-sys-on-primary-container);
+      mat-icon {
+        color: var(--app-good);
+      }
     }
     .counts {
       display: flex;

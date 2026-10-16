@@ -73,6 +73,30 @@ const PREFIXES = [
 const US_STATES =
   'AL|AK|AZ|AR|CA|CO|CT|DE|FL|GA|HI|ID|IL|IN|IA|KS|KY|LA|ME|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VT|VA|WA|WV|WI|WY|DC';
 
+/** First words of common multi-word US city names ("SAN FRANCISCO", "LOS ANGELES", "NEW YORK", ...). */
+const CITY_PREFIXES = new Set([
+  'SAN',
+  'SANTA',
+  'LOS',
+  'LAS',
+  'NEW',
+  'FORT',
+  'FT',
+  'ST',
+  'SAINT',
+  'EL',
+  'PALO',
+  'PORT',
+  'SALT',
+  'LONG',
+  'NORTH',
+  'SOUTH',
+  'EAST',
+  'WEST',
+  'MOUNT',
+  'MT',
+]);
+
 /**
  * Derives a merchant key for rule suggestions: strips processor prefixes (POS DEBIT, SQ *, TST*, ACH, dates),
  * trailing store numbers / reference ids / city+state. `AMZN Mktp US*2K4L91` → `AMZN MKTP`.
@@ -95,8 +119,13 @@ export function deriveMerchantKey(description: string): string {
       /^[^A-Z0-9]+$/.test(t)
     ) {
       tokens.pop();
-      // A city usually precedes a state code: drop one more word if we just removed a state and >2 words remain.
-      if (stateRe.test(t) && tokens.length > 2) tokens.pop();
+      // A city precedes a state code: drop it too (and a multi-word city's prefix such as SAN / LOS / NEW),
+      // always keeping at least one word of the merchant name.
+      if (stateRe.test(t) && tokens.length > 1) {
+        tokens.pop();
+        if (tokens.length > 1 && CITY_PREFIXES.has(tokens[tokens.length - 1]))
+          tokens.pop();
+      }
       continue;
     }
     break;

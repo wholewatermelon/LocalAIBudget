@@ -32,8 +32,8 @@ describe('TransactionsPage', () => {
   ];
 
   beforeEach(() => {
-    notify = jasmine.createSpyObj<NotifyService>('NotifyService', ['info', 'error', 'action']);
-    notify.action.and.returnValue(of());
+    notify = jasmine.createSpyObj<NotifyService>('NotifyService', ['info', 'error', 'prompt']);
+    notify.prompt.and.returnValue(of());
     dialog = { open: jasmine.createSpy('open') };
     month = monthServiceStub('2024-01');
     TestBed.configureTestingModule({
@@ -143,7 +143,7 @@ describe('TransactionsPage', () => {
   }));
 
   it('after a correction, offers a rule and creates it when accepted, then reloads', fakeAsync(() => {
-    notify.action.and.returnValue(of(undefined));
+    notify.prompt.and.returnValue(of(undefined));
     init();
     tick(SEARCH_DEBOUNCE_MS);
     fixture.detectChanges();
@@ -153,18 +153,18 @@ describe('TransactionsPage', () => {
     const suggest = http.expectOne((r) => r.url === '/api/rules/suggest');
     expect(suggest.request.params.get('transactionId')).toBe('1');
     suggest.flush({ pattern: 'COFFEE', matchType: 'contains', matchCount: 12 });
-    expect(notify.action).toHaveBeenCalledWith('Always categorize COFFEE as Shopping? (12 matching)', 'Create rule');
+    expect(notify.prompt).toHaveBeenCalledWith('Always categorize COFFEE as Shopping? (12 matching)', 'Create rule');
     const create = http.expectOne({ method: 'POST', url: '/api/rules' });
     expect(create.request.body).toEqual({ pattern: 'COFFEE', matchType: 'contains', categoryId: 3, applyToExisting: true });
     create.flush({ id: 1, pattern: 'COFFEE', matchType: 'contains', categoryId: 3, categoryName: 'Shopping', priority: 0, hits: 0, appliedCount: 12 });
-    expect(notify.info).toHaveBeenCalledWith('Rule created — 12 transactions updated');
+    expect(notify.info).toHaveBeenCalledWith('Rule created — 12 transactions updated', 6000);
     expectCountsRefreshed(2); // after the PATCH and after the rule was applied
     fixture.detectChanges();
     flushList(); // reloaded with the same filters
   }));
 
   it('does not create a rule if the snackbar action is not clicked, and ignores suggest failures', fakeAsync(() => {
-    notify.action.and.returnValue(of());
+    notify.prompt.and.returnValue(of());
     init();
     tick(SEARCH_DEBOUNCE_MS);
     fixture.detectChanges();

@@ -103,6 +103,9 @@ describe('processing pipeline (e2e)', () => {
     expect(job.inserted).toBe(9);
     expect(job.skippedDuplicates).toBe(0);
     expect(job.categorized).toBe(9);
+    expect(job.message).toBe(
+      'Processed 2 files: 9 new rows — 0 by rules, 0 transfer pairs, 9 by Gemma (0 duplicates skipped)',
+    );
     expect(job.total).toBe(2 + 9);
     expect(job.processed).toBe(job.total);
 

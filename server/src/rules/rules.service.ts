@@ -139,11 +139,9 @@ export class RulesService {
   /** Ids of all transactions whose description matches (JS matching, same semantics as processing). */
   private async matchingIds(
     rule: Pick<RuleLike, 'pattern' | 'matchType'>,
-    onlyEditable: boolean,
   ): Promise<number[]> {
     const rows = await this.db.query<{ id: number; description: string }>(
-      `SELECT t.id, t.description FROM transactions t
-       ${onlyEditable ? `WHERE NOT t.is_manual_correction AND NOT EXISTS (SELECT 1 FROM transaction_splits s WHERE s.transaction_id = t.id)` : ''}`,
+      'SELECT t.id, t.description FROM transactions t',
     );
     return rows
       .filter((r) => ruleMatches(rule, r.description))
@@ -155,23 +153,51 @@ export class RulesService {
     matchType: MatchType = 'contains',
   ): Promise<{ matchCount: number; sample: Transaction[] }> {
     this.validatePattern(pattern, matchType);
-    const ids = await this.matchingIds({ pattern, matchType }, false);
+    const ids = await this.matchingIds({ pattern, matchType });
     const sample = ids.length
       ? await this.transactions.findWhere('t.id = ANY($1::int[])', [ids], 10)
       : [];
     return { matchCount: ids.length, sample };
   }
 
+  /**
+   * `matchCount` = exactly what `POST /rules { pattern, matchType: 'contains', applyToExisting: true }` (priority 0)
+   * would update — computed with the same function as applyToExisting.
+   */
   async suggest(
     transactionId: number,
   ): Promise<{ pattern: string; matchType: MatchType; matchCount: number }> {
     const tx = await this.transactions.get(transactionId);
     const pattern = deriveMerchantKey(tx.description);
-    const ids = await this.matchingIds(
-      { pattern, matchType: 'contains' },
-      false,
-    );
+    const existing = await this.list();
+    const candidate: RuleLike = {
+      // A newly created rule gets the highest id, so it loses id tie-breaks against existing rules.
+      id: Number.MAX_SAFE_INTEGER,
+      pattern,
+      matchType: 'contains',
+      categoryId: 0,
+      priority: 0,
+    };
+    const ids = await this.applicableIds(candidate, [...existing, candidate]);
     return { pattern, matchType: 'contains', matchCount: ids.length };
+  }
+
+  /**
+   * Rows `rule` would categorize when applied to existing transactions: not manual, not split, not transfer-paired,
+   * and `rule` is the winning rule among `allRules` (priority, then longest pattern, then lowest id).
+   */
+  private async applicableIds(
+    rule: RuleLike,
+    allRules: RuleLike[],
+  ): Promise<number[]> {
+    const rows = await this.db.query<{ id: number; description: string }>(
+      `SELECT t.id, t.description FROM transactions t
+       WHERE NOT COALESCE(t.is_manual_correction, false) AND t.transfer_pair_id IS NULL
+         AND NOT EXISTS (SELECT 1 FROM transaction_splits s WHERE s.transaction_id = t.id)`,
+    );
+    return rows
+      .filter((r) => findMatchingRule(allRules, r.description)?.id === rule.id)
+      .map((r) => r.id);
   }
 
   /**
@@ -181,15 +207,7 @@ export class RulesService {
    */
   async applyToExisting(ruleId: number): Promise<number> {
     const rule = await this.get(ruleId);
-    const allRules = await this.list();
-    const rows = await this.db.query<{ id: number; description: string }>(
-      `SELECT t.id, t.description FROM transactions t
-       WHERE NOT COALESCE(t.is_manual_correction, false) AND t.transfer_pair_id IS NULL
-         AND NOT EXISTS (SELECT 1 FROM transaction_splits s WHERE s.transaction_id = t.id)`,
-    );
-    const ids = rows
-      .filter((r) => findMatchingRule(allRules, r.description)?.id === rule.id)
-      .map((r) => r.id);
+    const ids = await this.applicableIds(rule, await this.list());
     if (!ids.length) return 0;
     await this.db.query(
       `UPDATE transactions SET category_id = $2, categorized_by = 'rule', ai_confidence = NULL, needs_review = false,

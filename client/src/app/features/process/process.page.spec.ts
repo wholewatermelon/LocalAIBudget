@@ -69,6 +69,19 @@ describe('ProcessPage', () => {
     expect(badges[1]).toContain('Off by $12.34');
   });
 
+  it('shows the completion message prominently', fakeAsync(() => {
+    flushLoad([], [makeJob({ id: 6, status: 'running' })]);
+    tick(0);
+    http
+      .expectOne('/api/jobs/6')
+      .flush(makeJob({ id: 6, status: 'completed', message: '13 new rows — 8 by rules, 1 transfer pair, 4 by Gemma' }));
+    fixture.detectChanges();
+    const msg = el.querySelector('[data-testid="job-message"]')!;
+    expect(msg.textContent).toContain('13 new rows — 8 by rules, 1 transfer pair, 4 by Gemma');
+    expect(msg.classList).toContain('done');
+    http.match(() => true).forEach((r) => r.flush([]));
+  }));
+
   it('shows rules applied / transfers matched in job progress', fakeAsync(() => {
     flushLoad([], [makeJob({ id: 5, status: 'running', rulesApplied: 4, transfersMatched: 2 })]);
     tick(0);

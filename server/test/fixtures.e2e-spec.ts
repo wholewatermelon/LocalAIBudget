@@ -315,6 +315,69 @@ describe('realistic statements (e2e)', () => {
       await ctx.http().delete(`/api/rules/${r.id}`).expect(204);
   });
 
+  it('suggest matchCount equals what applyToExisting actually updates (manual, split, paired rows excluded)', async () => {
+    const cats = (await ctx.http().get('/api/categories').expect(200)).body;
+    const id = (n: string) => cats.find((c: any) => c.name === n).id;
+    const amzn = find(await tx(), /AMZN Mktp/);
+    expect(amzn).toHaveLength(3);
+    // The clicked row is a manual correction (as after the client's PATCH) → excluded from the count.
+    await ctx
+      .http()
+      .patch(`/api/transactions/${amzn[0].id}`)
+      .send({ categoryId: id('Shopping') })
+      .expect(200);
+    const s = (
+      await ctx
+        .http()
+        .get(`/api/rules/suggest?transactionId=${amzn[0].id}`)
+        .expect(200)
+    ).body;
+    expect(s).toEqual({
+      pattern: 'AMZN MKTP',
+      matchType: 'contains',
+      matchCount: 2,
+    });
+    const rule = (
+      await ctx
+        .http()
+        .post('/api/rules')
+        .send({
+          pattern: s.pattern,
+          matchType: s.matchType,
+          categoryId: id('Shopping'),
+          applyToExisting: true,
+        })
+        .expect(201)
+    ).body;
+    expect(rule.appliedCount).toBe(s.matchCount);
+    await ctx.http().delete(`/api/rules/${rule.id}`).expect(204);
+
+    // A transfer-paired row: its own pair never counts.
+    const [paired] = find(
+      await tx('?month=2024-12'),
+      /^PAYMENT THANK YOU - WEB/,
+    );
+    const ps = (
+      await ctx
+        .http()
+        .get(`/api/rules/suggest?transactionId=${paired.id}`)
+        .expect(200)
+    ).body;
+    const pr = (
+      await ctx
+        .http()
+        .post('/api/rules')
+        .send({
+          pattern: ps.pattern,
+          categoryId: id('Transfer'),
+          applyToExisting: true,
+        })
+        .expect(201)
+    ).body;
+    expect(pr.appliedCount).toBe(ps.matchCount);
+    await ctx.http().delete(`/api/rules/${pr.id}`).expect(204);
+  });
+
   it('review queue: filter and bulk approve', async () => {
     const queue = await tx('?needsReview=true');
     expect(queue.length).toBeGreaterThan(0);

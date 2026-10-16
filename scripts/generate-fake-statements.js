@@ -17,6 +17,13 @@
  *   node scripts/generate-fake-statements.js --out <dir>     -> <dir>/YYYY-MM/...
  *   node scripts/generate-fake-statements.js --fixtures      -> fixtures/statements/ (flat, small, + .expected.json)
  *   node scripts/generate-fake-statements.js --fixtures --out <dir>
+ *   node scripts/generate-fake-statements.js --from 2024-08 --to 2025-02   -> any month range (same rules per month)
+ *   node scripts/generate-fake-statements.js --demo [--upload-dir demo/upload]
+ *       -> demo set: wipes <out>/YYYY-MM folders, writes 2024-08..2025-01 all accounts (savings TXT every month,
+ *          Summit paid in full monthly), 2024-10 checking with a $42.17 reconciliation mismatch, 2025-02 checking only,
+ *          and the small live-upload Summit_Rewards_Visa_2025-02.pdf in --upload-dir. Used by scripts/demo-*.js.
+ *
+ * --fixtures always uses the fixed 2024-11..2025-01 ledger; fixtures/statements/ must stay byte-identical.
  *
  * All institutions, people, addresses, account numbers and routing numbers are fictional.
  */
@@ -29,17 +36,24 @@ const path = require('path');
 // ------------------------------------------------------------------------------------------------ CLI
 
 function parseArgs(argv) {
-  const opts = { out: null, fixtures: false };
+  const opts = { out: null, fixtures: false, demo: false, from: null, to: null, uploadDir: path.join('demo', 'upload') };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--fixtures') opts.fixtures = true;
     else if (a === '--out') opts.out = argv[++i];
     else if (a.startsWith('--out=')) opts.out = a.slice(6);
+    else if (a === '--demo') opts.demo = true;
+    else if (a === '--from') opts.from = argv[++i];
+    else if (a === '--to') opts.to = argv[++i];
+    else if (a === '--upload-dir') opts.uploadDir = argv[++i];
     else if (a === '-h' || a === '--help') {
-      console.log('Usage: node scripts/generate-fake-statements.js [--out <dir>] [--fixtures]');
+      console.log('Usage: node scripts/generate-fake-statements.js [--out <dir>] [--from YYYY-MM --to YYYY-MM] [--fixtures | --demo [--upload-dir <dir>]]');
       process.exit(0);
     } else throw new Error(`Unknown argument: ${a}`);
   }
+  const ymRe = /^\d{4}-(0[1-9]|1[0-2])$/;
+  for (const k of ['from', 'to']) if (opts[k] && !ymRe.test(opts[k])) throw new Error(`--${k} must be YYYY-MM`);
+  if (opts.fixtures && (opts.from || opts.to || opts.demo)) throw new Error('--fixtures uses a fixed month range; it cannot be combined with --from/--to/--demo');
   if (!opts.out) opts.out = opts.fixtures ? path.join('fixtures', 'statements') : path.join('data', 'statements');
   return opts;
 }
@@ -88,7 +102,7 @@ function toDate(iso) { const [y, m, d] = iso.split('-').map(Number); return new 
 function toIso(dt) { return dt.toISOString().slice(0, 10); }
 function addDays(iso, n) { const d = toDate(iso); d.setUTCDate(d.getUTCDate() + n); return toIso(d); }
 function dow(iso) { return toDate(iso).getUTCDay(); }
-const HOLIDAYS = new Set(['2024-11-11', '2024-11-28', '2024-12-25', '2025-01-01', '2025-01-20']);
+const HOLIDAYS = new Set(['2024-09-02', '2024-10-14', '2024-11-11', '2024-11-28', '2024-12-25', '2025-01-01', '2025-01-20', '2025-02-17']);
 function isBusinessDay(iso) { const w = dow(iso); return w !== 0 && w !== 6 && !HOLIDAYS.has(iso); }
 function nextBusinessDay(iso) { let d = iso; while (!isBusinessDay(d)) d = addDays(d, 1); return d; }
 function lastDayOfMonth(ym) { const [y, m] = ym.split('-').map(Number); return toIso(new Date(Date.UTC(y, m, 0))); }
@@ -106,7 +120,20 @@ let SEQ = 0; // global insertion order -> stable sort within a day
 
 // ------------------------------------------------------------------------------------------------ household
 
-const MONTHS = ['2024-11', '2024-12', '2025-01'];
+const DEFAULT_MONTHS = ['2024-11', '2024-12', '2025-01'];
+const DEMO_FROM = '2024-08';
+const DEMO_LIVE_MONTH = '2025-02'; // checking pre-loaded; Summit uploaded live from demo/upload/
+const DEMO_MISMATCH_MONTH = '2024-10';
+let MONTHS = DEFAULT_MONTHS; // ledger months; set by buildLedgers()
+function monthRange(from, to) {
+  const out = [];
+  for (let ym = from; ym <= to; ym = addDays(lastDayOfMonth(ym), 1).slice(0, 7)) out.push(ym);
+  if (!out.length) throw new Error(`Empty month range ${from}..${to}`);
+  return out;
+}
+const nextMonth = (ym) => addDays(lastDayOfMonth(ym), 1).slice(0, 7);
+const firstDay = () => `${MONTHS[0]}-01`;
+const lastDay = () => lastDayOfMonth(MONTHS[MONTHS.length - 1]);
 const HOUSEHOLD = {
   names: ['JORDAN M RIVERA', 'CASEY L RIVERA'],
   street: '418 LARKSPUR LN',
@@ -120,27 +147,32 @@ const ACCT = {
 };
 const baseName = (acct, ym) => `${acct.name.replace(/ /g, '_')}_${ym}`;
 
-const CHECKING_OPENING = 4812.37; // balance on 2024-11-01 morning
+const CHECKING_OPENING = 4812.37; // balance on the first morning of the range
+const CHECKING_OPENING_DEMO = 8312.37; // demo household runs a 7-month slight deficit; keep checking positive
 const SAVINGS_OPENING_DEC = 12640.55;
 const SUMMIT_PREV_BALANCE = 3214.56; // owed, carried into the 11/05 cycle
 const HARBOR_OPENING_OWED = 1284.17; // October spend, auto-paid in November
 const SUMMIT_APR = 22.99;
-const SUMMIT_CYCLES = [
-  { ym: '2024-11', start: '2024-11-05', end: '2024-12-04' },
-  { ym: '2024-12', start: '2024-12-05', end: '2025-01-04' },
-  { ym: '2025-01', start: '2025-01-05', end: '2025-02-04' },
-];
-const SUMMIT_PAYMENTS = { '2024-11': 1500.0, '2024-12': 1850.0, '2025-01': 2275.0 };
+// Summit cycle for month M runs M-05 .. (M+1)-04
+const summitCycles = () => MONTHS.map((ym) => ({ ym, start: `${ym}-05`, end: `${nextMonth(ym)}-04` }));
+const SUMMIT_PAYMENTS = {
+  '2024-08': 1400.0, '2024-09': 1650.0, '2024-10': 1300.0,
+  '2024-11': 1500.0, '2024-12': 1850.0, '2025-01': 2275.0, '2025-02': 1900.0,
+};
+let DEMO = false; // demo ledger: Summit paid in full monthly, extra income, savings statements every month
 
 // ------------------------------------------------------------------------------------------------ ledgers
 
-function buildLedgers() {
+function buildLedgers(months = DEFAULT_MONTHS, { demo = false } = {}) {
   SEQ = 0;
+  MONTHS = months;
+  DEMO = demo;
+  const allSavings = demo;
   const summit = buildSummit(new Rng(0x5a11));
   const harbor = buildHarbor(new Rng(0x4a7b));
-  const savings = buildSavings();
+  const savings = buildSavings(allSavings);
   const checking = buildChecking(new Rng(0xc4ec), summit, harbor, savings);
-  finishSummitCycles(summit);
+  if (demo) closeSummitCyclesPaidInFull(summit, MONTHS.length); else finishSummitCycles(summit);
   return { checking, savings, summit, harbor };
 }
 
@@ -155,7 +187,7 @@ function buildSummit(rng) {
   const pools = [
     { w: 4, kind: 'grocery', f: () => [rng.pick(['COSTCO WHSE #0681 WOOD VILLAGE OR', 'NEW SEASONS MARKET FAIRVIEW OR', 'SAFEWAY #1544 FAIRVIEW OR']), rng.amount(38, 265)] },
     { w: 3, kind: 'restaurant', f: () => [rng.pick(['TST* LUIGIS TRATTORIA FAIRVIEW OR', 'TST* PINE STATE BISCUITS PORTLAND OR', 'SQ *TACO PEDRO GRESHAM OR', 'OLIVE GARDEN 0012345 GRESHAM OR', 'PIZZICATO #14 PORTLAND OR']), rng.amount(18, 96)] },
-    { w: 4, kind: 'coffee', f: () => [rng.pick(['SQ *BLUE BOTTLE COFFEE SAN FRANCISCO CA', 'STARBUCKS STORE 05521 GRESHAM OR', 'SQ *CASCADE ROASTERS FAIRVIEW OR']), rng.amount(4.25, 14.8)] },
+    { w: 4, kind: 'coffee', f: () => [rng.pick(['SQ *BLUE BOTTLE COFFEE OAKLAND CA', 'STARBUCKS STORE 05521 GRESHAM OR', 'SQ *CASCADE ROASTERS FAIRVIEW OR']), rng.amount(4.25, 14.8)] },
     { w: 3, kind: 'amazon', f: () => [amzn(), rng.amount(9.99, 129.99)] },
     { w: 1, kind: 'gas', f: () => [rng.pick(['SHELL OIL 57442110021 FAIRVIEW OR', 'COSTCO GAS #0681 WOOD VILLAGE OR']), rng.amount(38, 72)] },
     { w: 1, kind: 'shopping', f: () => [rng.pick(['TARGET 00012345 GRESHAM OR', 'KOHL\'S #1129 GRESHAM OR', 'REI #57 PORTLAND OR', 'POWELL\'S BOOKS PORTLAND OR']), rng.amount(14, 160)] },
@@ -163,7 +195,7 @@ function buildSummit(rng) {
   const totalW = pools.reduce((a, p) => a + p.w, 0);
   const pickPool = () => { let r = rng.float() * totalW; for (const p of pools) { if ((r -= p.w) < 0) return p; } return pools[0]; };
 
-  eachDay('2024-11-01', '2025-02-04', (d) => {
+  eachDay(firstDay(), `${nextMonth(MONTHS[MONTHS.length - 1])}-04`, (d) => {
     const day = +d.slice(8, 10);
     if (day === 3) add(d, 'SQ *LITTLE STARS DANCE ACADEMY FAIRVIEW OR', -95.0, 'purchase', 'kids');
     if (day === 9) add(d, 'SPOTIFY USA 877-778-1161 NY', -16.99, 'purchase', 'streaming', 0);
@@ -189,9 +221,28 @@ function addSummitPayment(summit, checkingDate, amount) {
   summit.rows.push({ transDate: d, postDate: d, desc: 'PAYMENT THANK YOU - WEB', amount, section: 'credit', kind: 'payment', seq: SEQ++ });
 }
 
+/**
+ * Demo variant: the household pays each statement balance in full, so no interest accrues. Cycles are closed
+ * incrementally because the payment in cycle M (made on the 20th) equals the closing balance of cycle M-1.
+ */
+function closeSummitCyclesPaidInFull(summit, upTo) {
+  const cycles = summitCycles();
+  while (summit.cycles.length < upTo) {
+    const c = cycles[summit.cycles.length];
+    const prev = summit.cycles.length ? summit.cycles[summit.cycles.length - 1].closing : SUMMIT_PREV_BALANCE;
+    const all = summit.rows.filter((r) => inRange(r.postDate, c.start, c.end));
+    summit.cycles.push({ ...c, opening: prev, closing: round2(prev - sum(all)) });
+  }
+}
+function demoSummitPayment(summit, ym) {
+  const i = MONTHS.indexOf(ym);
+  closeSummitCyclesPaidInFull(summit, i);
+  return i === 0 ? SUMMIT_PREV_BALANCE : summit.cycles[i - 1].closing;
+}
+
 function finishSummitCycles(summit) {
   let prev = SUMMIT_PREV_BALANCE;
-  for (const c of SUMMIT_CYCLES) {
+  for (const c of summitCycles()) {
     const inCycle = summit.rows.filter((r) => inRange(r.postDate, c.start, c.end));
     const pay = sum(inCycle.filter((r) => r.kind === 'payment'));
     const purchases = -sum(inCycle.filter((r) => r.section === 'purchase'));
@@ -222,7 +273,7 @@ function buildHarbor(rng) {
   ];
   const totalW = pools.reduce((a, p) => a + p.w, 0);
   const pickPool = () => { let r = rng.float() * totalW; for (const p of pools) { if ((r -= p.w) < 0) return p; } return pools[0]; };
-  eachDay('2024-11-01', '2025-01-31', (d) => {
+  eachDay(firstDay(), lastDay(), (d) => {
     const day = +d.slice(8, 10);
     if (day === 2) add(d, 'APPLE.COM/BILL 866-712-7753 CA', 'Entertainment', 'Sale', -9.99, 'streaming');
     if (day === 18) add(d, 'HULU 877-8244858 CA', 'Entertainment', 'Sale', -18.99, 'streaming');
@@ -250,8 +301,18 @@ function buildHarbor(rng) {
   return { rows, months };
 }
 
-/* ---- Maple Federal Savings (only December is published, as TXT) ---- */
-function buildSavings() {
+/* ---- Maple Federal Savings (default: only December is published, as TXT; allSavings: every month) ---- */
+function buildSavings(allSavings) {
+  if (allSavings) {
+    const rows = [];
+    for (const ym of MONTHS) {
+      const xfer = nextBusinessDay(`${ym}-05`); // checking side
+      rows.push({ date: nextBusinessDay(addDays(xfer, 1)), desc: 'ONLINE TRANSFER FROM MAPLE FEDERAL CHECKING XXXXXX2290', amount: 500.0, kind: 'xfer-in', seq: SEQ++ });
+      if (ym === '2024-12') rows.push({ date: '2024-12-18', desc: 'ONLINE TRANSFER TO MAPLE FEDERAL CHECKING XXXXXX2290 HOLIDAY', amount: -300.0, kind: 'xfer-out', seq: SEQ++ });
+      rows.push({ date: lastDayOfMonth(ym), desc: 'INTEREST PAYMENT', amount: round2(5.2 + MONTHS.indexOf(ym) * 0.23), kind: 'interest', seq: SEQ++ });
+    }
+    return { rows, opening: null, closing: null };
+  }
   const rows = [
     { date: '2024-12-06', desc: 'ONLINE TRANSFER FROM MAPLE FEDERAL CHECKING XXXXXX2290', amount: 500.0, kind: 'xfer-in', seq: SEQ++ },
     { date: '2024-12-18', desc: 'ONLINE TRANSFER TO MAPLE FEDERAL CHECKING XXXXXX2290 HOLIDAY', amount: -300.0, kind: 'xfer-out', seq: SEQ++ },
@@ -277,7 +338,9 @@ function buildChecking(rng, summit, harbor, savings) {
   let checkNo = 1041;
 
   // payroll: biweekly Fridays + semimonthly (15th & last business day)
-  for (let d = '2024-11-01'; d <= '2025-01-31'; d = addDays(d, 14)) add(d, 'ACH DEPOSIT BRIGHTLINE LOGISTICS PAYROLL PPD ID: 9100234517', 2846.15, 'payroll');
+  let payday = '2024-11-01'; // biweekly anchor (a Friday)
+  while (addDays(payday, -14) >= firstDay()) payday = addDays(payday, -14);
+  for (let d = payday; d <= lastDay(); d = addDays(d, 14)) add(d, 'ACH DEPOSIT BRIGHTLINE LOGISTICS PAYROLL PPD ID: 9100234517', 2846.15, 'payroll');
   for (const ym of MONTHS) {
     add(nextBusinessDay(`${ym}-15`), 'ACH DEPOSIT CEDARVALE SCHOOL DIST DIR DEP PPD ID: 5520017784', 1912.4, 'payroll');
     add(lastBusinessDayOfMonth(ym), 'ACH DEPOSIT CEDARVALE SCHOOL DIST DIR DEP PPD ID: 5520017784', 1912.4, 'payroll');
@@ -293,8 +356,10 @@ function buildChecking(rng, summit, harbor, savings) {
     add(nextBusinessDay(`${ym}-0${rng.int(6, 9)}`), `CHECK #${checkNo++}`, -160.0, 'check');
     // Summit payment from checking on the 20th (bd); card side posts 1-3 days later with the same amount
     const sDate = nextBusinessDay(`${ym}-20`);
-    add(sDate, `ONLINE PMT SUMMIT VISA ACCT ENDING ${ACCT.summit.last4} CONF# ${rng.code(8)}`, -SUMMIT_PAYMENTS[ym], 'card-payment');
-    addSummitPayment(summit, sDate, SUMMIT_PAYMENTS[ym]);
+    const sAmount = DEMO ? demoSummitPayment(summit, ym) : SUMMIT_PAYMENTS[ym];
+    add(sDate, `ONLINE PMT SUMMIT VISA ACCT ENDING ${ACCT.summit.last4} CONF# ${rng.code(8)}`, -sAmount, 'card-payment');
+    addSummitPayment(summit, sDate, sAmount);
+    if (DEMO) add(nextBusinessDay(`${ym}-10`), 'ACH DEPOSIT HARBORVIEW CONSULTING INVOICE PPD ID: 8830021147', 1350.0, 'payroll');
     // Harbor autopay: card shows it on payDate, checking debited next business day
     const h = harbor.months.find((m) => m.ym === ym);
     add(nextBusinessDay(addDays(h.payDate, 1)), 'HARBOR CARD AUTOPAY PPD ID: 7781000231', -h.payment, 'card-payment');
@@ -314,7 +379,7 @@ function buildChecking(rng, summit, harbor, savings) {
   add('2025-01-29', 'MOBILE DEPOSIT REF NUMBER :418820557731', 125.0, 'mobile-deposit');
 
   // ATM withdrawals and card purchases (description carries the purchase date; posts 0-1 business days later)
-  eachDay('2024-11-01', '2025-01-31', (d) => {
+  eachDay(firstDay(), lastDay(), (d) => {
     if ([2, 16].includes(+d.slice(8, 10)) || d === '2024-12-14') {
       const atm = d === '2024-12-14' ? 'ATM WITHDRAWAL 12/14 FIRSTLINE CU ATM 800 NE 181ST AVE GRESHAM OR' : `ATM WITHDRAWAL ${mmdd(d)} MAPLE FEDERAL ATM #2210 2210 MAIN ST FAIRVIEW OR`;
       add(nextBusinessDay(d), atm, -rng.pick([60, 100, 200]), 'atm');
@@ -325,14 +390,14 @@ function buildChecking(rng, summit, harbor, savings) {
       const [m, amt] = p.f();
       const prefix = p.kind === 'gas' || rng.chance(0.3) ? 'POS DEBIT' : 'DEBIT CARD PURCHASE';
       const post = rng.chance(0.4) ? d : nextBusinessDay(addDays(d, 1));
-      if (post > '2025-01-31') continue;
+      if (post > lastDay()) continue;
       add(post, `${prefix} ${mmdd(d)} ${m}`, -amt, p.kind);
     }
   });
   rows.sort(byDate('date'));
 
   // running balance + per-month statements
-  let bal = CHECKING_OPENING;
+  let bal = DEMO ? CHECKING_OPENING_DEMO : CHECKING_OPENING;
   for (const r of rows) { bal = round2(bal + r.amount); r.balance = bal; }
   const months = MONTHS.map((ym) => {
     const mr = rows.filter((r) => r.date.startsWith(ym));
@@ -469,20 +534,20 @@ async function renderCheckingPdf(file, st) {
       rowsOnPage = 0;
     }
   };
-  rowLine('', 'Beginning Balance', '', '', fmt(opening));
+  rowLine('', 'Beginning Balance', '', '', fmtSigned(opening));
   y += 12;
   let bal = opening;
   for (const r of rows) {
     bal = round2(bal + r.amount);
     const lines = wrap(doc, r.desc, 245);
     ensureSpace(lines.length * 10 + 2);
-    rowLine(mmdd(r.date), lines[0], r.amount < 0 ? fmt(r.amount) : '', r.amount > 0 ? fmt(r.amount) : '', fmt(bal));
+    rowLine(mmdd(r.date), lines[0], r.amount < 0 ? fmt(r.amount) : '', r.amount > 0 ? fmt(r.amount) : '', fmtSigned(bal));
     for (const extra of lines.slice(1)) { y += 10; put(doc, extra, 80, y); }
     y += 12;
     rowsOnPage++;
   }
   ensureSpace(14);
-  rowLine('', 'Ending Balance', '', '', fmt(statedClosing));
+  rowLine('', 'Ending Balance', '', '', fmtSigned(statedClosing));
   y += 24;
 
   // ---- daily ending balance (NOT transactions)
@@ -500,7 +565,7 @@ async function renderCheckingPdf(file, st) {
     if (y + 12 > PAGE_BOTTOM) { doc.addPage(); y = continuationHeader(); put(doc, 'DAILY ENDING BALANCE (continued)', 36, y, { font: 'Helvetica-Bold', size: 10 }); y += 16; }
     daily.slice(i, i + perRow).forEach(([d, b], j) => {
       put(doc, mmdd(d), 40 + j * 180, y);
-      put(doc, `$${fmt(b)}`, 170 + j * 180, y, { align: 'right' });
+      put(doc, money(b), 170 + j * 180, y, { align: 'right' });
     });
     y += 12;
   }
@@ -825,13 +890,15 @@ function writeExpected(file, obj) { fs.writeFileSync(`${file}.expected.json`, JS
 
 // ------------------------------------------------------------------------------------------------ main
 
-async function generateData(L, outRoot) {
+async function generateData(L, outRoot, { outMonths = MONTHS, demo = false } = {}) {
   const made = [];
   const dirFor = (ym) => { const d = path.join(outRoot, ym); fs.mkdirSync(d, { recursive: true }); return d; };
-  for (const ym of MONTHS) {
+  for (const ym of outMonths) {
     const dir = dirFor(ym);
     const ck = checkingStatement(L, ym);
+    if (demo && ym === DEMO_MISMATCH_MONTH) ck.closingOffset = 42.17; // deliberate reconciliation failure
     let f = path.join(dir, `${baseName(ACCT.checking, ym)}.pdf`); await renderCheckingPdf(f, ck); made.push([f, ck.rows.length]);
+    if (demo && ym === DEMO_LIVE_MONTH) continue; // live month: only checking is pre-loaded
     f = path.join(dir, `${baseName(ACCT.summit, ym)}.pdf`); const ss = summitStatement(L, ym); await renderSummitPdf(f, ss); made.push([f, ss.rows.length]);
     const hs = harborStatement(L, ym);
     if (ym === '2024-11') { f = path.join(dir, `${baseName(ACCT.harbor, ym)}.qfx`); writeHarborQfx(f, hs); }
@@ -841,9 +908,43 @@ async function generateData(L, outRoot) {
       f = path.join(dir, `${baseName(ACCT.checking, ym)}.csv`); writeCheckingCsv(f, ck); made.push([f, ck.rows.length]);
       f = path.join(dir, `${baseName(ACCT.checking, ym)}.ofx`); writeCheckingOfx(f, ck); made.push([f, ck.rows.length]);
     }
-    if (ym === '2024-12') { f = path.join(dir, `${baseName(ACCT.savings, ym)}.txt`); writeTxt(f, L.savings.rows); made.push([f, L.savings.rows.length]); }
+    const sv = L.savings.rows.filter((r) => r.date.startsWith(ym));
+    if (demo ? sv.length : ym === '2024-12') { f = path.join(dir, `${baseName(ACCT.savings, ym)}.txt`); writeTxt(f, sv); made.push([f, sv.length]); }
   }
   return made;
+}
+
+/**
+ * Demo upload: a small Summit statement for the live month (cycle 02/05-03/04, rows only through 02/28).
+ * Designed so most rows hit pre-staged rules (AMZN MKTP, SHELL, NETFLIX, COSTCO WHSE) or the coffee rule created live
+ * (BLUE BOTTLE COFFEE), the payment pairs with the pre-loaded checking statement, and only 4 merchants go to Gemma.
+ */
+async function generateDemoUpload(L, dir) {
+  fs.mkdirSync(dir, { recursive: true });
+  const ym = DEMO_LIVE_MONTH;
+  const c = L.summit.cycles.find((x) => x.ym === ym);
+  const rng = new Rng(0xde70);
+  const pay = L.summit.rows.find((r) => r.kind === 'payment' && inRange(r.postDate, c.start, c.end));
+  const P = (transDate, desc, amount, kind, lag = 1) =>
+    ({ transDate, postDate: addDays(transDate, lag), desc, amount: round2(amount), section: 'purchase', kind, seq: SEQ++ });
+  const rows = [
+    { ...pay },
+    P(`${ym}-03`, 'SQ *LITTLE STARS DANCE ACADEMY FAIRVIEW OR', -95.0, 'kids', 2),
+    P(`${ym}-06`, 'SQ *BLUE BOTTLE COFFEE OAKLAND CA', -rng.amount(5, 9), 'coffee'),
+    P(`${ym}-07`, 'COSTCO WHSE #0681 WOOD VILLAGE OR', -rng.amount(140, 230), 'grocery'),
+    P(`${ym}-09`, 'SPOTIFY USA 877-778-1161 NY', -16.99, 'streaming', 0),
+    P(`${ym}-11`, `AMZN Mktp US*${rng.code(6)} Amzn.com/bill WA`, -rng.amount(20, 80), 'amazon'),
+    P(`${ym}-13`, 'SQ *BLUE BOTTLE COFFEE OAKLAND CA', -rng.amount(5, 9), 'coffee'),
+    P(`${ym}-14`, 'TST* PINE STATE BISCUITS PORTLAND OR', -rng.amount(40, 70), 'restaurant'),
+    P(`${ym}-15`, 'NETFLIX.COM 866-579-7172 CA', -22.99, 'streaming', 0),
+    P(`${ym}-18`, 'SHELL OIL 57442110021 FAIRVIEW OR', -rng.amount(40, 65), 'gas'),
+    P(`${ym}-22`, 'REI #57 PORTLAND OR', -rng.amount(60, 120), 'shopping', 2),
+    P(`${ym}-24`, `AMZN Mktp US*${rng.code(6)} Amzn.com/bill WA`, -rng.amount(15, 60), 'amazon'),
+    P(`${ym}-26`, 'SQ *BLUE BOTTLE COFFEE OAKLAND CA', -rng.amount(5, 9), 'coffee'),
+  ];
+  const f = path.join(dir, `${baseName(ACCT.summit, ym)}.pdf`);
+  await renderSummitPdf(f, { start: c.start, end: c.end, opening: c.opening, rows, ytdFees: 0, ytdInterest: 0 });
+  return [[f, rows.length]];
 }
 
 async function generateFixtures(L, dir) {
@@ -936,8 +1037,29 @@ async function generateFixtures(L, dir) {
 
 async function main() {
   const opts = parseArgs(process.argv.slice(2));
-  const L = buildLedgers();
-  const made = opts.fixtures ? await generateFixtures(L, opts.out) : await generateData(L, opts.out);
+  let made;
+  if (opts.fixtures) {
+    made = await generateFixtures(buildLedgers(), opts.out);
+  } else if (opts.demo) {
+    // Demo: history ${DEMO_FROM}..month before the live month, all accounts; live month = checking only (+ upload file)
+    const months = monthRange(opts.from || DEMO_FROM, opts.to || DEMO_LIVE_MONTH);
+    if (!months.includes(DEMO_LIVE_MONTH) || !months.includes(DEMO_MISMATCH_MONTH)) throw new Error(`--demo range must include ${DEMO_MISMATCH_MONTH} and ${DEMO_LIVE_MONTH}`);
+    const L = buildLedgers(months, { demo: true });
+    // the output folder must mirror the demo DB snapshot exactly: remove stale month folders (uploads, old months)
+    if (fs.existsSync(opts.out)) {
+      for (const d of fs.readdirSync(opts.out)) {
+        if (!/^\d{4}-\d{2}$/.test(d)) continue;
+        const p = path.join(opts.out, d);
+        fs.rmSync(p, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 }); // Windows: file may be briefly locked
+        if (fs.existsSync(p)) throw new Error(`Could not remove ${p} (file in use?)`);
+      }
+    }
+    made = await generateData(L, opts.out, { demo: true });
+    made.push(...(await generateDemoUpload(L, opts.uploadDir)));
+  } else {
+    const months = opts.from || opts.to ? monthRange(opts.from || DEFAULT_MONTHS[0], opts.to || DEFAULT_MONTHS[DEFAULT_MONTHS.length - 1]) : DEFAULT_MONTHS;
+    made = await generateData(buildLedgers(months), opts.out);
+  }
   for (const [f, n] of made) console.log(`Generated ${f} (${n} transactions)`);
 }
 
