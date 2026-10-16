@@ -9,15 +9,27 @@ const cats = [
     isIncome: false,
     isTransfer: false,
   },
-  { id: 3, name: 'Income', budgetLimit: 0, isIncome: true, isTransfer: false },
+  {
+    id: 3,
+    name: 'Income',
+    budgetLimit: null,
+    isIncome: true,
+    isTransfer: false,
+  },
   {
     id: 4,
     name: 'Transfer',
-    budgetLimit: 0,
+    budgetLimit: null,
     isIncome: false,
     isTransfer: true,
   },
-  { id: 5, name: 'Other', budgetLimit: 0, isIncome: false, isTransfer: false },
+  {
+    id: 5,
+    name: 'Other',
+    budgetLimit: null,
+    isIncome: false,
+    isTransfer: false,
+  },
 ];
 
 describe('computeBudgetSummary', () => {
@@ -53,9 +65,11 @@ describe('computeBudgetSummary', () => {
       isTransfer: false,
     });
     expect(s.categories.find((c) => c.name === 'Income')!.spent).toBe(3000);
-    expect(
-      s.categories.find((c) => c.name === 'Other')!.percentUsed,
-    ).toBeNull();
+    expect(s.categories.find((c) => c.name === 'Other')).toMatchObject({
+      budgetLimit: null,
+      remaining: null,
+      percentUsed: null,
+    });
     // Transfer is listed (flagged) but excluded from totals.
     expect(s.categories.find((c) => c.name === 'Transfer')).toMatchObject({
       isTransfer: true,

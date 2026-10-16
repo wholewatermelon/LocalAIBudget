@@ -19,6 +19,11 @@ export const routes: Routes = [
       import('./features/transactions/transactions.page').then((m) => m.TransactionsPage),
   },
   {
+    path: 'budget',
+    title: 'Budget · LocalAI Budget',
+    loadComponent: () => import('./features/budget/budget.page').then((m) => m.BudgetPage),
+  },
+  {
     path: 'categories',
     title: 'Categories · LocalAI Budget',
     loadComponent: () =>

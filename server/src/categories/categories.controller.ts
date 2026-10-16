@@ -9,36 +9,23 @@ import {
   Patch,
   Post,
 } from '@nestjs/common';
-import { Type } from 'class-transformer';
 import {
   IsBoolean,
   IsNotEmpty,
-  IsNumber,
   IsOptional,
   IsString,
   MaxLength,
-  Min,
 } from 'class-validator';
 import { CategoriesService, Category } from './categories.service';
 
 export class CreateCategoryDto {
   @IsString() @IsNotEmpty() @MaxLength(100) name!: string;
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber({ maxDecimalPlaces: 2 })
-  @Min(0)
-  budgetLimit?: number;
   @IsOptional() @IsBoolean() isIncome?: boolean;
   @IsOptional() @IsBoolean() isTransfer?: boolean;
 }
 
 export class UpdateCategoryDto {
   @IsOptional() @IsString() @IsNotEmpty() @MaxLength(100) name?: string;
-  @IsOptional()
-  @Type(() => Number)
-  @IsNumber({ maxDecimalPlaces: 2 })
-  @Min(0)
-  budgetLimit?: number;
   @IsOptional() @IsBoolean() isIncome?: boolean;
   @IsOptional() @IsBoolean() isTransfer?: boolean;
 }

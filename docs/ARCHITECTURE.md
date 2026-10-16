@@ -337,3 +337,95 @@ category_rules(
     `needs_review = true` and a job error is recorded; the job still completes. Insights timeout → 504.
 14. **Rules `applyToExisting`** only touches rows where the new rule is the winning rule (priority, then longest pattern) and
     skips manual, split and transfer-paired rows.
+
+---
+
+## H. Main budget + monthly adjustments (approved 2026-10-16) — supersedes `categories.budget_limit`
+
+### Concepts
+- **Main budget**: versioned per category. Each version says "from month M, category C = amount" (or "not budgeted").
+  Editing the main budget always asks for an `effectiveFrom` month (default: currently selected month), so past months keep
+  the budget they had.
+- **Month adjustment**: an override for one (month, category): a different amount, or `hidden` (not budgeted that month).
+  A category can be budgeted in a single month only (month-only item) without being in the main budget.
+- **Effective budget** for (M, C) = adjustment if present, else the latest main version with `effective_from <= M`.
+- Only spending categories are budgetable (`is_income = false AND is_transfer = false`) → 400 otherwise.
+
+### Schema (migration 003)
+```sql
+budget_main_items(
+  id serial PK, category_id int NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
+  effective_from char(7) NOT NULL,            -- 'YYYY-MM'
+  amount numeric(12,2),                       -- NULL = removed from main budget from this month on
+  created_at timestamptz DEFAULT now(),
+  UNIQUE(category_id, effective_from)
+)
+budget_month_items(
+  id serial PK, month char(7) NOT NULL, category_id int NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
+  amount numeric(12,2),                       -- required unless hidden
+  hidden boolean NOT NULL DEFAULT false,
+  note text, updated_at timestamptz DEFAULT now(),
+  UNIQUE(month, category_id)
+)
+```
+Migration copies every `categories.budget_limit > 0` into `budget_main_items` with `effective_from` = earliest transaction month
+(or current month if none), then drops `categories.budget_limit`. `budgetLimit` is removed from the Category API and from
+`POST/PATCH /api/categories` (send → 400 via whitelist is fine).
+
+### API
+- `GET /api/budget/main?month=YYYY-MM` → main budget as of that month:
+  `{ month, items: { categoryId, categoryName, amount, effectiveFrom, hasLaterChange: boolean }[], total }` (only categories with non-null amount)
+- `GET /api/budget/main/history?categoryId=` → `{ effectiveFrom, amount|null, createdAt }[]` oldest first
+- `PUT /api/budget/main/items/:categoryId` `{ amount: number|null, effectiveFrom: 'YYYY-MM' }` → upsert that version (null = remove from
+  main from that month). Returns the main budget as of `effectiveFrom`.
+- `DELETE /api/budget/main/items/:categoryId/versions/:effectiveFrom` → 204 (undo a version)
+- `POST /api/budget/main/seed/preview` and `POST /api/budget/main/seed` body
+  `{ fromMonth, source: 'actual'|'budget'|'average', averageMonths?: number (default 3), roundTo?: 1|5|10|25|50 (default 25), effectiveFrom }`
+  - `actual`: spent per spending category in `fromMonth`; `budget`: effective budget of `fromMonth`; `average`: mean spent over the
+    `averageMonths` months ending at `fromMonth` (months with no transactions at all are skipped).
+  - Amounts rounded **up** to `roundTo`; zero amounts omitted.
+  - preview → `{ items: { categoryId, categoryName, amount, currentMainAmount|null }[], total }` (no writes).
+  - seed → writes a version at `effectiveFrom` for every proposed item, and a `NULL` version at `effectiveFrom` for categories currently
+    in main but absent from the proposal (so main as of `effectiveFrom` equals the proposal). Single transaction. Returns main as of `effectiveFrom`.
+- `GET /api/budget/month?month=YYYY-MM` →
+  ```
+  { month, totalBudgeted, totalSpent,
+    items: { categoryId, categoryName, mainAmount|null, adjustedAmount|null, hidden, note|null,
+             effectiveAmount|null, source: 'main'|'adjusted'|'month-only'|'hidden'|'unbudgeted', spent, remaining|null }[] }
+  ```
+  Lists every spending category that has a main amount, an adjustment, or spending that month. `unbudgeted` = spending but no budget.
+- `PUT /api/budget/month/:month/items/:categoryId` `{ amount?: number, hidden?: boolean, note?: string }` → month view
+- `DELETE /api/budget/month/:month/items/:categoryId` → reset to main → month view
+- `POST /api/budget/month/:month/copy-adjustments` `{ fromMonth }` → copies all adjustments of `fromMonth` that don't already exist → month view
+- `GET /api/budget/summary` and trend: `budgetLimit` now = effective amount (null if none/hidden); `percentUsed` from that.
+- Insights: prompt uses effective budgets for the month and main amounts; suggestion objects unchanged.
+- All reads go through `CategoryAccessService` (future per-person visibility).
+
+### UI
+- New **Budget** page `/budget` (nav item), two tabs:
+  1. **This month** (selected month): table Category | Main | This month (inline editable) | Spent | Remaining.
+     Adjusted rows show an "adjusted" chip + note + "reset to main" icon; month-only rows a "this month only" chip; hidden rows greyed
+     with "un-hide". "Add category for this month" (choose an existing spending category or create a new one inline).
+     "Copy adjustments from previous month" button. Totals row (budgeted vs spent).
+  2. **Main budget** (as of selected month): editable amounts; saving asks "Apply starting:" month (default selected month) with a note
+     that earlier months are unchanged. Per-row history (versions, with undo). Add/remove category. **"Create from a month…"** dialog:
+     month, source (actual / budget / average of N months), round to, start month → preview table showing current vs proposed → confirm.
+- Categories page: budget limit column removed; link "Edit budgets →" to the Budget page.
+- Dashboard: insight suggestion "Apply" opens a menu: **Just this month** (PUT month item) / **Main budget from this month on**
+  (PUT main item with effectiveFrom = month). Budget bars show an "adjusted" marker when the source is `adjusted`/`month-only`.
+
+### H. Backend implementation notes / deviations (server agent)
+1. `GET /api/budget/summary` category rows: `remaining` is `null` (not `0 − spent`) when the category has no effective budget
+   (none / hidden / income / transfer); `percentUsed` is `null` then too.
+2. `GET /api/budget/trend` points gain `totalBudgeted` (Σ effective budgets of that month; additive).
+3. Migration 003 copies `budget_limit > 0` only for spending categories (income/transfer limits are not budgetable and are dropped).
+4. Seed preview `currentMainAmount` = main amount as of `effectiveFrom`. Seed writes tombstones only for categories visible to
+   the viewer. `averageMonths` is 1–24.
+5. `PUT /api/budget/month/:month/items/:categoryId`: `amount` may be omitted when the row already has an adjustment (a note-only
+   edit keeps the amount; `note: ""` clears the note). Without any existing amount and without `hidden: true` → 400.
+   Un-hiding (`hidden: false`, no amount) a hidden-only row whose category has a main amount simply resets it to main.
+6. Status codes: unknown category → 404, non-spending category → 400 (main and month item writes);
+   `POST …/seed/preview`, `POST …/seed`, `POST …/copy-adjustments` and `DELETE /api/budget/month/:month/items/:categoryId` → 200 with
+   the documented body; `DELETE …/versions/:effectiveFrom` → 404 if that version doesn't exist. `copy-adjustments` with
+   `fromMonth == month` → 400 and skips categories that are no longer budgetable.
+7. Month view: items sorted by category name; `totalSpent` = Σ `spent` of the listed spending categories (uncategorized excluded).

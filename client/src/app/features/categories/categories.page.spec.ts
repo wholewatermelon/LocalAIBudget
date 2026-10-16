@@ -2,6 +2,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { MatDialog } from '@angular/material/dialog';
+import { provideRouter } from '@angular/router';
 import { of } from 'rxjs';
 import { makeCategory } from '../../../testing/fixtures';
 import { NotifyService } from '../../core/notify.service';
@@ -23,6 +24,7 @@ describe('CategoriesPage', () => {
         provideHttpClientTesting(),
         { provide: NotifyService, useValue: notify },
         { provide: MatDialog, useValue: { open: () => ({ afterClosed: () => of(true) }) } },
+        provideRouter([]),
       ],
     });
     http = TestBed.inject(HttpTestingController);
@@ -32,8 +34,8 @@ describe('CategoriesPage', () => {
     fixture.detectChanges();
     http.expectOne('/api/categories').flush([
       makeCategory({ id: 1, name: 'Food', transactionCount: 4 }),
-      makeCategory({ id: 2, name: 'Transfer', budgetLimit: 0, isTransfer: true }),
-      makeCategory({ id: 3, name: 'Income', isIncome: true, budgetLimit: 0 }),
+      makeCategory({ id: 2, name: 'Transfer', isTransfer: true }),
+      makeCategory({ id: 3, name: 'Income', isIncome: true }),
     ]);
     fixture.detectChanges();
   });
@@ -53,7 +55,7 @@ describe('CategoriesPage', () => {
     page['newTransfer'].set(true);
     page.add();
     const req = http.expectOne({ method: 'POST', url: '/api/categories' });
-    expect(req.request.body).toEqual({ name: 'Card Payments', budgetLimit: 0, isIncome: false, isTransfer: true });
+    expect(req.request.body).toEqual({ name: 'Card Payments', isIncome: false, isTransfer: true });
     req.flush(makeCategory({ id: 10, name: 'Card Payments', isTransfer: true }));
     expect(page['newTransfer']()).toBeFalse();
   });
@@ -71,11 +73,10 @@ describe('CategoriesPage', () => {
 
   it('adds a category', () => {
     page['newName'].set('Pets');
-    page['newLimit'].set(50);
     page.add();
     const req = http.expectOne({ method: 'POST', url: '/api/categories' });
-    expect(req.request.body).toEqual({ name: 'Pets', budgetLimit: 50, isIncome: false, isTransfer: false });
-    req.flush(makeCategory({ id: 9, name: 'Pets', budgetLimit: 50 }));
+    expect(req.request.body).toEqual({ name: 'Pets', isIncome: false, isTransfer: false });
+    req.flush(makeCategory({ id: 9, name: 'Pets' }));
     fixture.detectChanges();
     expect(el.querySelectorAll('[data-testid="category-row"]').length).toBe(4);
   });
@@ -87,19 +88,21 @@ describe('CategoriesPage', () => {
     expect(notify.error).toHaveBeenCalledWith('A category named "Food" already exists.');
   });
 
-  it('saves edited budget limits only when changed', () => {
-    const food = page['store'].categories()[0];
-    page.save(food, { budgetLimit: 400 });
-    http.expectNone('/api/categories/1');
-    page.save(food, { budgetLimit: 450.555 });
-    const req = http.expectOne({ method: 'PATCH', url: '/api/categories/1' });
-    expect(req.request.body).toEqual({ budgetLimit: 450.56 });
-    req.flush(makeCategory({ id: 1, name: 'Food', budgetLimit: 450.56 }));
+  it('has no budget column and links to the Budget page', () => {
+    expect(el.textContent).not.toContain('Monthly budget');
+    const link = el.querySelector<HTMLAnchorElement>('[data-testid="edit-budgets"]')!;
+    expect(link.getAttribute('href')).toContain('/budget');
+    expect(link.getAttribute('href')).toContain('tab=main');
   });
 
-  it('rejects negative limits client-side', () => {
-    page.save(page['store'].categories()[0], { budgetLimit: -5 });
-    expect(notify.error).toHaveBeenCalled();
+  it('renames a category only when the name changed', () => {
+    const food = page['store'].categories()[0];
+    page.save(food, { name: ' Food ' });
+    http.expectNone('/api/categories/1');
+    page.save(food, { name: 'Groceries' });
+    const req = http.expectOne({ method: 'PATCH', url: '/api/categories/1' });
+    expect(req.request.body).toEqual({ name: 'Groceries' });
+    req.flush(makeCategory({ id: 1, name: 'Groceries' }));
   });
 
   it('explains a 409 on delete (category in use)', () => {

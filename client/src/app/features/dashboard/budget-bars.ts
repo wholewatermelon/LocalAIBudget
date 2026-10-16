@@ -2,11 +2,14 @@ import { CurrencyPipe, DecimalPipe } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 import { MatIconModule } from '@angular/material/icon';
 import { isNonSpendingCategory, isTransfer } from '../../core/category-utils';
-import { BudgetCategory } from '../../core/models';
+import { BudgetCategory, MonthBudgetSource } from '../../core/models';
 import { BudgetStatus, STATUS_LABEL, budgetStatus, percentUsed } from './budget-status';
 
 interface BarRow {
   cat: BudgetCategory;
+  limit: number;
+  remaining: number;
+  adjusted: 'adjusted' | 'month-only' | null;
   status: BudgetStatus;
   pct: number | null;
   width: number;
@@ -30,11 +33,20 @@ const STATUS_ICON: Record<BudgetStatus, string> = {
     @for (r of rows(); track r.cat.categoryId) {
       <div class="row" [attr.data-status]="r.status" data-testid="budget-row">
         <div class="head">
-          <span class="name">{{ r.cat.name }}</span>
+          <span class="name">
+            {{ r.cat.name }}
+            @if (r.adjusted) {
+              <span
+                class="adjusted"
+                data-testid="adjusted-marker"
+                [title]="r.adjusted === 'month-only' ? 'Budgeted for this month only' : 'Adjusted for this month'"
+              >{{ r.adjusted === 'month-only' ? 'this month only' : 'adjusted' }}</span>
+            }
+          </span>
           <span class="amounts tabular">
             {{ r.cat.spent | currency }}
-            @if (r.cat.budgetLimit > 0) {
-              <span class="muted">/ {{ r.cat.budgetLimit | currency }}</span>
+            @if (r.limit > 0) {
+              <span class="muted">/ {{ r.limit | currency }}</span>
             }
           </span>
         </div>
@@ -55,12 +67,12 @@ const STATUS_ICON: Record<BudgetStatus, string> = {
               · {{ r.pct | number: '1.0-0' }}%
             }
           </span>
-          @if (r.cat.budgetLimit > 0) {
+          @if (r.limit > 0) {
             <span class="muted tabular">
-              @if (r.cat.remaining >= 0) {
-                {{ r.cat.remaining | currency }} left
+              @if (r.remaining >= 0) {
+                {{ r.remaining | currency }} left
               } @else {
-                {{ -r.cat.remaining | currency }} over
+                {{ -r.remaining | currency }} over
               }
             </span>
           }
@@ -156,6 +168,15 @@ const STATUS_ICON: Record<BudgetStatus, string> = {
       margin: 16px 0 4px;
       color: var(--mat-sys-on-surface-variant);
     }
+    .adjusted {
+      margin-left: 6px;
+      padding: 0 6px;
+      border-radius: 8px;
+      font: var(--mat-sys-label-small);
+      background: var(--mat-sys-tertiary-container);
+      color: var(--mat-sys-on-tertiary-container);
+      vertical-align: middle;
+    }
     .income-row {
       display: flex;
       justify-content: space-between;
@@ -165,6 +186,8 @@ const STATUS_ICON: Record<BudgetStatus, string> = {
 })
 export class BudgetBars {
   readonly categories = input.required<BudgetCategory[]>();
+  /** Section H month-view sources by categoryId (optional; drives the "adjusted" marker). */
+  readonly sources = input<ReadonlyMap<number, MonthBudgetSource>>(new Map());
 
   protected readonly icon = STATUS_ICON;
   protected readonly label = STATUS_LABEL;
@@ -175,8 +198,13 @@ export class BudgetBars {
       .filter((c) => !isNonSpendingCategory(c))
       .map((cat) => {
         const pct = percentUsed(cat.spent, cat.budgetLimit);
+        const limit = cat.budgetLimit ?? 0;
+        const source = this.sources().get(cat.categoryId);
         return {
           cat,
+          limit,
+          remaining: cat.remaining ?? limit - cat.spent,
+          adjusted: source === 'adjusted' || source === 'month-only' ? source : null,
           status: budgetStatus(cat.spent, cat.budgetLimit),
           pct,
           width: pct === null ? (cat.spent > 0 ? 100 : 0) : Math.min(100, pct),

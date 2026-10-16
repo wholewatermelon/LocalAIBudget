@@ -2,6 +2,10 @@ import {
   BudgetSummary,
   Category,
   Insight,
+  MainBudget,
+  MainBudgetItem,
+  MonthBudget,
+  MonthBudgetItem,
   Job,
   MonthSummary,
   StatementFile,
@@ -51,7 +55,6 @@ export function makeCategory(over: Partial<Category> = {}): Category {
   return {
     id: 1,
     name: 'Food',
-    budgetLimit: 400,
     isIncome: false,
     isTransfer: false,
     isAiSuggested: false,
@@ -108,4 +111,38 @@ export function makeInsight(over: Partial<Insight> = {}): Insight {
     createdAt: '2024-02-01T00:00:00Z',
     ...over,
   };
+}
+
+export function makeMonthItem(over: Partial<MonthBudgetItem> = {}): MonthBudgetItem {
+  return {
+    categoryId: 1,
+    categoryName: 'Food',
+    mainAmount: 400,
+    adjustedAmount: null,
+    hidden: false,
+    note: null,
+    effectiveAmount: 400,
+    source: 'main',
+    spent: 100,
+    remaining: 300,
+    ...over,
+  };
+}
+
+export function makeMonthBudget(items: MonthBudgetItem[], over: Partial<MonthBudget> = {}): MonthBudget {
+  return {
+    month: '2024-03',
+    totalBudgeted: items.reduce((s, i) => s + (i.effectiveAmount ?? 0), 0),
+    totalSpent: items.reduce((s, i) => s + i.spent, 0),
+    items,
+    ...over,
+  };
+}
+
+export function makeMainBudget(items: MainBudgetItem[], month = '2024-03'): MainBudget {
+  return { month, items, total: items.reduce((s, i) => s + i.amount, 0) };
+}
+
+export function makeMainItem(over: Partial<MainBudgetItem> = {}): MainBudgetItem {
+  return { categoryId: 1, categoryName: 'Food', amount: 400, effectiveFrom: '2024-01', hasLaterChange: false, ...over };
 }

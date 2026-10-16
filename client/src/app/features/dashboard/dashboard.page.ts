@@ -5,11 +5,12 @@ import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { RouterLink } from '@angular/router';
-import { Subscription, forkJoin } from 'rxjs';
+import { Subscription, catchError, forkJoin, of } from 'rxjs';
 import { BudgetApi } from '../../core/api/budget.api';
+import { BudgetPlanApi } from '../../core/api/budget-plan.api';
 import { isTransfer, isTransferCategory } from '../../core/category-utils';
 import { CategoryStore } from '../../core/category.store';
-import { BudgetSummary, Month, TrendPoint } from '../../core/models';
+import { BudgetSummary, Month, MonthBudgetSource, TrendPoint } from '../../core/models';
 import { MonthService } from '../../core/month.service';
 import { formatMonth } from '../../core/month-utils';
 import { BudgetBars } from './budget-bars';
@@ -97,12 +98,12 @@ import { TrendChart } from './trend-chart';
           <mat-card appearance="outlined" class="budgets">
             <mat-card-header><mat-card-title>Budgets</mat-card-title></mat-card-header>
             <mat-card-content>
-              <app-budget-bars [categories]="s.categories" />
+              <app-budget-bars [categories]="s.categories" [sources]="sources()" />
             </mat-card-content>
           </mat-card>
 
           <div class="side">
-            <app-insights-panel [month]="month()" (changed)="reload()" />
+            <app-insights-panel [month]="month()" [budgets]="budgets()" (changed)="reload()" />
             <mat-card appearance="outlined">
               <mat-card-header><mat-card-title>Last 6 months</mat-card-title></mat-card-header>
               <mat-card-content>
@@ -162,11 +163,17 @@ export class DashboardPage {
   private readonly budget = inject(BudgetApi);
   private readonly months = inject(MonthService);
   private readonly categories = inject(CategoryStore);
+  private readonly budgetPlan = inject(BudgetPlanApi);
 
   protected readonly month = this.months.selected;
   protected readonly monthLabel = computed(() => formatMonth(this.month() ?? ''));
   protected readonly summary = signal<BudgetSummary | null>(null);
   protected readonly trend = signal<TrendPoint[]>([]);
+  /** Section H month view sources (adjusted / month-only markers). Empty if the endpoint fails. */
+  protected readonly sources = signal<ReadonlyMap<number, MonthBudgetSource>>(new Map());
+  protected readonly budgets = computed<ReadonlyMap<number, number | null>>(
+    () => new Map((this.summary()?.categories ?? []).map((c) => [c.categoryId, c.budgetLimit])),
+  );
   protected readonly loading = signal(false);
   protected readonly uncategorizedCount = computed(
     () => this.months.selectedSummary()?.uncategorizedCount ?? 0,
@@ -213,10 +220,12 @@ export class DashboardPage {
     this.sub = forkJoin({
       summary: this.budget.summary(month),
       trend: this.budget.trend(6, month),
+      monthView: this.budgetPlan.month(month, true).pipe(catchError(() => of(null))),
     }).subscribe({
-      next: ({ summary, trend }) => {
+      next: ({ summary, trend, monthView }) => {
         this.summary.set(summary);
         this.trend.set(trend);
+        this.sources.set(new Map((monthView?.items ?? []).map((i) => [i.categoryId, i.source])));
         this.loading.set(false);
       },
       error: () => {

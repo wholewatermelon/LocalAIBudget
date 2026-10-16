@@ -1,0 +1,141 @@
+<div class="toolbar">
+  <button mat-stroked-button (click)="copyFromPrevious()" [disabled]="loading()" data-testid="copy-adjustments">
+    <mat-icon>content_copy</mat-icon> Copy adjustments from {{ prevLabel() }}
+  </button>
+</div>
+
+<div class="table-card">
+  @if (loading()) {
+    <mat-progress-bar mode="indeterminate" />
+  }
+  @if (view(); as v) {
+    @if (v.items.length === 0) {
+      <p class="empty-state">Nothing budgeted or spent this month yet. Set up a main budget, or add a category below.</p>
+    } @else {
+      <table class="budget">
+        <thead>
+          <tr>
+            <th>Category</th>
+            <th class="num">Main</th>
+            <th class="num">This month</th>
+            <th class="num">Spent</th>
+            <th class="num">Remaining</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (item of v.items; track item.categoryId) {
+            @let st = rowState(item);
+            <tr [class.greyed]="st.greyed" data-testid="month-row" [attr.data-source]="item.source">
+              <td>
+                <div class="cat">
+                  {{ item.categoryName }}
+                  @if (st.chip) {
+                    <span class="chip" [class]="'chip ' + st.chip.cls" data-testid="row-chip">{{ st.chip.label }}</span>
+                  }
+                </div>
+                @if (st.hasNote) {
+                  <input
+                    class="note"
+                    #noteInput
+                    [value]="item.note ?? ''"
+                    placeholder="Add a note…"
+                    (change)="editNote(item, noteInput.value)"
+                    [attr.aria-label]="'Note for ' + item.categoryName"
+                  />
+                }
+              </td>
+              <td class="num tabular muted">{{ item.mainAmount === null ? '—' : (item.mainAmount | currency) }}</td>
+              <td class="num">
+                @if (item.hidden) {
+                  <span class="muted">not budgeted</span>
+                } @else {
+                  <mat-form-field appearance="outline" subscriptSizing="dynamic" class="amount-field">
+                    <span matTextPrefix>$&nbsp;</span>
+                    <input
+                      matInput
+                      #amt
+                      type="number"
+                      min="0"
+                      step="1"
+                      [value]="item.effectiveAmount ?? ''"
+                      [placeholder]="item.source === 'unbudgeted' ? 'Set' : ''"
+                      [disabled]="busy().has(item.categoryId)"
+                      (change)="editAmount(item, amt.value)"
+                      [attr.aria-label]="item.categoryName + ' budget this month'"
+                      data-testid="month-amount"
+                    />
+                  </mat-form-field>
+                }
+              </td>
+              <td class="num tabular">{{ item.spent | currency }}</td>
+              <td class="num tabular" [class.over]="item.remaining !== null && item.remaining < 0">
+                {{ item.remaining === null ? '—' : (item.remaining | currency) }}
+              </td>
+              <td class="actions">
+                @if (st.canReset) {
+                  <button
+                    mat-icon-button
+                    (click)="reset(item)"
+                    [matTooltip]="item.source === 'month-only' ? 'Remove from this month' : 'Reset to main budget'"
+                    [attr.aria-label]="'Reset ' + item.categoryName"
+                    data-testid="reset"
+                  >
+                    <mat-icon>{{ item.source === 'month-only' ? 'remove_circle_outline' : 'restart_alt' }}</mat-icon>
+                  </button>
+                }
+                @if (st.canHide) {
+                  <button mat-icon-button (click)="hide(item)" matTooltip="Don't budget this month" [attr.aria-label]="'Hide ' + item.categoryName" data-testid="hide">
+                    <mat-icon>visibility_off</mat-icon>
+                  </button>
+                }
+                @if (st.canUnhide) {
+                  <button mat-icon-button (click)="unhide(item)" matTooltip="Un-hide" [attr.aria-label]="'Un-hide ' + item.categoryName" data-testid="unhide">
+                    <mat-icon>visibility</mat-icon>
+                  </button>
+                }
+              </td>
+            </tr>
+          }
+        </tbody>
+        <tfoot>
+          <tr data-testid="month-totals">
+            <th>Total <span class="muted hint" title="Uncategorized spending isn't included">(excl. uncategorized)</span></th>
+            <th></th>
+            <th class="num tabular">{{ v.totalBudgeted | currency }}</th>
+            <th class="num tabular">{{ v.totalSpent | currency }}</th>
+            <th class="num tabular" [class.over]="v.totalBudgeted - v.totalSpent < 0">
+              {{ v.totalBudgeted - v.totalSpent | currency }}
+            </th>
+            <th></th>
+          </tr>
+        </tfoot>
+      </table>
+    }
+  }
+</div>
+
+<form class="add" (ngSubmit)="add()">
+  <span class="add-label">Add category for this month</span>
+  <mat-form-field appearance="outline" subscriptSizing="dynamic">
+    <mat-label>Category</mat-label>
+    <mat-select name="addCat" [ngModel]="addCategoryId()" (ngModelChange)="addCategoryId.set($event)" data-testid="add-category">
+      @for (c of addable(); track c.id) {
+        <mat-option [value]="c.id">{{ c.name }}</mat-option>
+      }
+      <mat-option [value]="NEW_CATEGORY"><em>New category…</em></mat-option>
+    </mat-select>
+  </mat-form-field>
+  @if (addCategoryId() === NEW_CATEGORY) {
+    <mat-form-field appearance="outline" subscriptSizing="dynamic">
+      <mat-label>New category name</mat-label>
+      <input matInput name="newName" [ngModel]="addNewName()" (ngModelChange)="addNewName.set($event)" maxlength="100" data-testid="add-new-name" />
+    </mat-form-field>
+  }
+  <mat-form-field appearance="outline" subscriptSizing="dynamic" class="amount-field">
+    <mat-label>Amount</mat-label>
+    <span matTextPrefix>$&nbsp;</span>
+    <input matInput type="number" min="0" name="addAmount" [ngModel]="addAmount()" (ngModelChange)="addAmount.set($event)" data-testid="add-amount" />
+  </mat-form-field>
+  <button mat-flat-button type="submit" [disabled]="!canAdd()" data-testid="add-submit"><mat-icon>add</mat-icon> Add</button>
+</form>

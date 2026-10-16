@@ -21,18 +21,18 @@ describe('CategoriesApi', () => {
   });
 
   it('POSTs a new category', () => {
-    api.create({ name: 'Pets', budgetLimit: 50, isIncome: false }).subscribe();
+    api.create({ name: 'Pets', isIncome: false }).subscribe();
     const req = http.expectOne('/api/categories');
     expect(req.request.method).toBe('POST');
-    expect(req.request.body).toEqual({ name: 'Pets', budgetLimit: 50, isIncome: false });
+    expect(req.request.body).toEqual({ name: 'Pets', isIncome: false });
     req.flush({});
   });
 
   it('PATCHes a category', () => {
-    api.update(3, { budgetLimit: 120 }).subscribe();
+    api.update(3, { isTransfer: true }).subscribe();
     const req = http.expectOne('/api/categories/3');
     expect(req.request.method).toBe('PATCH');
-    expect(req.request.body).toEqual({ budgetLimit: 120 });
+    expect(req.request.body).toEqual({ isTransfer: true });
     req.flush({});
   });
 

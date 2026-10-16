@@ -126,7 +126,6 @@ export interface SplitInput {
 export interface Category {
   id: number;
   name: string;
-  budgetLimit: number;
   isIncome: boolean;
   /** ARCHITECTURE F.2. Optional only for older servers; use `isTransfer()` from category-utils. */
   isTransfer?: boolean;
@@ -134,9 +133,9 @@ export interface Category {
   transactionCount: number;
 }
 
+/** Budget amounts live in the Budget API (section H), not on categories. */
 export interface CategoryCreate {
   name: string;
-  budgetLimit?: number;
   isIncome?: boolean;
   isTransfer?: boolean;
 }
@@ -154,10 +153,11 @@ export type AccountUpdate = Partial<Pick<Account, 'accountName' | 'accountType'>
 export interface BudgetCategory {
   categoryId: number;
   name: string;
-  budgetLimit: number;
+  /** Effective budget for the month (section H): adjustment, else main; null when none or hidden. */
+  budgetLimit: number | null;
   spent: number;
-  remaining: number;
-  /** 0-100 scale; null when budgetLimit = 0 (ARCHITECTURE F.1). The UI computes colour from spent/limit. */
+  remaining: number | null;
+  /** 0-100 scale; null without a budget (ARCHITECTURE F.1). The UI computes colour from spent/limit. */
   percentUsed: number | null;
   isIncome: boolean;
   /** ARCHITECTURE F.2 */
@@ -177,6 +177,8 @@ export interface TrendPoint {
   month: Month;
   totalIncome: number;
   totalSpent: number;
+  /** Section H: sum of effective budgets that month (optional for older servers). */
+  totalBudgeted?: number;
   byCategory: Record<string, number>;
 }
 
@@ -238,4 +240,79 @@ export interface RuleSuggestion {
   pattern: string;
   matchType: MatchType;
   matchCount: number;
+}
+
+// ---- Section H: main budget + monthly adjustments ----
+
+export interface MainBudgetItem {
+  categoryId: number;
+  categoryName: string;
+  amount: number;
+  effectiveFrom: Month;
+  /** A later version exists (so editing "from M" doesn't affect months after that version). */
+  hasLaterChange: boolean;
+}
+
+export interface MainBudget {
+  month: Month;
+  items: MainBudgetItem[];
+  total: number;
+}
+
+export interface MainBudgetVersion {
+  effectiveFrom: Month;
+  /** null = removed from the main budget from this month on. */
+  amount: number | null;
+  createdAt: string;
+}
+
+export type SeedSource = 'actual' | 'budget' | 'average';
+export type RoundTo = 1 | 5 | 10 | 25 | 50;
+
+export interface SeedRequest {
+  fromMonth: Month;
+  source: SeedSource;
+  averageMonths?: number;
+  roundTo?: RoundTo;
+  effectiveFrom: Month;
+}
+
+export interface SeedPreviewItem {
+  categoryId: number;
+  categoryName: string;
+  amount: number;
+  currentMainAmount: number | null;
+}
+
+export interface SeedPreview {
+  items: SeedPreviewItem[];
+  total: number;
+}
+
+export type MonthBudgetSource = 'main' | 'adjusted' | 'month-only' | 'hidden' | 'unbudgeted';
+
+export interface MonthBudgetItem {
+  categoryId: number;
+  categoryName: string;
+  mainAmount: number | null;
+  adjustedAmount: number | null;
+  hidden: boolean;
+  note: string | null;
+  effectiveAmount: number | null;
+  source: MonthBudgetSource;
+  spent: number;
+  remaining: number | null;
+}
+
+export interface MonthBudget {
+  month: Month;
+  totalBudgeted: number;
+  totalSpent: number;
+  items: MonthBudgetItem[];
+}
+
+export interface MonthItemUpdate {
+  amount?: number;
+  hidden?: boolean;
+  note?: string;
 }

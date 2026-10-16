@@ -9,6 +9,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { RouterLink } from '@angular/router';
 import { filter } from 'rxjs';
 import { isTransfer } from '../../core/category-utils';
 import { CategoryStore } from '../../core/category.store';
@@ -39,6 +40,7 @@ export function categoryErrorMessage(err: unknown, action: 'create' | 'update' |
     MatIconModule,
     MatTooltipModule,
     MatProgressBarModule,
+    RouterLink,
   ],
   templateUrl: './categories.page.html',
   styleUrl: './categories.page.scss',
@@ -49,7 +51,6 @@ export class CategoriesPage {
   private readonly dialog = inject(MatDialog);
 
   protected readonly newName = signal('');
-  protected readonly newLimit = signal<number | null>(null);
   protected readonly newIncome = signal(false);
   protected readonly newTransfer = signal(false);
   protected readonly creating = signal(false);
@@ -66,7 +67,6 @@ export class CategoriesPage {
     this.store
       .create({
         name,
-        budgetLimit: this.newLimit() ?? 0,
         isIncome: this.newIncome(),
         isTransfer: this.newTransfer(),
       })
@@ -74,7 +74,6 @@ export class CategoriesPage {
         next: () => {
           this.creating.set(false);
           this.newName.set('');
-          this.newLimit.set(null);
           this.newIncome.set(false);
           this.newTransfer.set(false);
           this.notify.info(`Added ${name}`);
@@ -91,15 +90,6 @@ export class CategoriesPage {
     if (change.name !== undefined) {
       change.name = change.name.trim();
       if (!change.name || change.name === c.name) return;
-    }
-    if (change.budgetLimit !== undefined) {
-      const v = Number(change.budgetLimit);
-      if (!Number.isFinite(v) || v < 0) {
-        this.notify.error('Budget limit must be a positive number');
-        return;
-      }
-      change.budgetLimit = Math.round(v * 100) / 100;
-      if (change.budgetLimit === c.budgetLimit) return;
     }
     if (change.isIncome !== undefined && change.isIncome === c.isIncome) return;
     if (change.isTransfer !== undefined && change.isTransfer === isTransfer(c)) return;

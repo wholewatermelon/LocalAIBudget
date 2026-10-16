@@ -3,7 +3,8 @@ import { round2 } from '../common/month';
 export interface BudgetCategoryInfo {
   id: number;
   name: string;
-  budgetLimit: number;
+  /** Effective budget for the month (section H); null = none / hidden / not budgetable. */
+  budgetLimit: number | null;
   isIncome: boolean;
   isTransfer: boolean;
 }
@@ -18,10 +19,11 @@ export interface CategoryFlow {
 export interface BudgetCategoryLine {
   categoryId: number;
   name: string;
-  budgetLimit: number;
+  budgetLimit: number | null;
   spent: number;
-  remaining: number;
-  /** 0–100 scale, 1 decimal; null when no limit is set. */
+  /** null when there is no budget for the category this month. */
+  remaining: number | null;
+  /** 0–100 scale, 1 decimal; null when there is no (or a zero) budget. */
   percentUsed: number | null;
   isIncome: boolean;
   isTransfer: boolean;
@@ -80,11 +82,11 @@ export function computeBudgetSummary(
       return {
         categoryId: c.id,
         name: c.name,
-        budgetLimit: round2(c.budgetLimit),
+        budgetLimit: c.budgetLimit === null ? null : round2(c.budgetLimit),
         spent: s,
-        remaining: round2(c.budgetLimit - s),
+        remaining: c.budgetLimit === null ? null : round2(c.budgetLimit - s),
         percentUsed:
-          c.budgetLimit > 0
+          c.budgetLimit !== null && c.budgetLimit > 0
             ? Math.round((s / c.budgetLimit) * 1000) / 10
             : null,
         isIncome: c.isIncome,

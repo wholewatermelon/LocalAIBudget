@@ -1,17 +1,15 @@
 <div class="page">
   <div class="page-header">
     <h1>Categories</h1>
+    <a mat-button routerLink="/budget" [queryParams]="{ tab: 'main' }" queryParamsHandling="merge" data-testid="edit-budgets">
+      Edit budgets →
+    </a>
   </div>
 
   <form class="add" (ngSubmit)="add()">
     <mat-form-field appearance="outline" subscriptSizing="dynamic" class="name">
       <mat-label>New category</mat-label>
       <input matInput name="newName" [ngModel]="newName()" (ngModelChange)="newName.set($event)" required maxlength="100" data-testid="new-name" />
-    </mat-form-field>
-    <mat-form-field appearance="outline" subscriptSizing="dynamic" class="limit">
-      <mat-label>Monthly budget</mat-label>
-      <span matTextPrefix>$&nbsp;</span>
-      <input matInput type="number" min="0" step="1" name="newLimit" [ngModel]="newLimit()" (ngModelChange)="newLimit.set($event)" />
     </mat-form-field>
     <mat-checkbox name="newIncome" [ngModel]="newIncome()" (ngModelChange)="newIncome.set($event)">Income</mat-checkbox>
     <mat-checkbox
@@ -39,7 +37,6 @@
         <thead>
           <tr>
             <th>Name</th>
-            <th>Monthly budget</th>
             <th>Income</th>
             <th>Transfer</th>
             <th class="num">Transactions</th>
@@ -62,22 +59,6 @@
                 @if (c.isAiSuggested) {
                   <span class="badge badge-ai" matTooltip="Suggested by AI">ai</span>
                 }
-              </td>
-              <td>
-                <mat-form-field appearance="outline" subscriptSizing="dynamic" class="cell-field limit">
-                  <span matTextPrefix>$&nbsp;</span>
-                  <input
-                    matInput
-                    #limitInput
-                    type="number"
-                    min="0"
-                    step="1"
-                    [value]="c.budgetLimit"
-                    [disabled]="c.isIncome || isTransfer(c)"
-                    (change)="save(c, { budgetLimit: +limitInput.value })"
-                    [attr.aria-label]="'Budget for ' + c.name"
-                  />
-                </mat-form-field>
               </td>
               <td>
                 <mat-checkbox

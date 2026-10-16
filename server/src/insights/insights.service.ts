@@ -5,6 +5,7 @@ import {
   Injectable,
   ServiceUnavailableException,
 } from '@nestjs/common';
+import { BudgetPlanService } from '../budget/budget-plan.service';
 import { BudgetService } from '../budget/budget.service';
 import { CategoriesService } from '../categories/categories.service';
 import { round2 } from '../common/month';
@@ -45,12 +46,22 @@ const toInsight = (r: any): Insight => ({
 /** Validates the model's answer; unknown category names (and transfer/hidden ones) are dropped. */
 export function interpretInsightResponse(
   raw: unknown,
-  categories: { id: number; name: string }[],
+  categories: {
+    id: number;
+    name: string;
+    isIncome?: boolean;
+    isTransfer?: boolean;
+  }[],
 ): { summary: string; suggestions: InsightSuggestion[] } | null {
   if (!raw || typeof raw !== 'object') return null;
   const o = raw as { summary?: unknown; suggestions?: unknown };
   if (typeof o.summary !== 'string' || !o.summary.trim()) return null;
-  const byName = new Map(categories.map((c) => [c.name.toLowerCase(), c]));
+  // Only budgetable (spending) categories can be applied by the client; income/transfer → dropped like unknown names.
+  const byName = new Map(
+    categories
+      .filter((c) => !c.isIncome && !c.isTransfer)
+      .map((c) => [c.name.toLowerCase(), c]),
+  );
   const suggestions: InsightSuggestion[] = [];
   const seen = new Set<number>();
   for (const s of Array.isArray(o.suggestions) ? o.suggestions : []) {
@@ -86,6 +97,7 @@ export class InsightsService {
   constructor(
     private readonly db: DbService,
     private readonly budget: BudgetService,
+    private readonly plan: BudgetPlanService,
     private readonly categories: CategoriesService,
     @Inject(LLM_CLIENT) private readonly llm: LlmClient,
   ) {}
@@ -103,16 +115,35 @@ export class InsightsService {
     const cats = (await this.categories.list()).filter((c) => !c.isTransfer);
     const trend = await this.budget.trend(6, month);
     const current = await this.budget.summary(month);
+    const [mainBudget, monthBudget] = await Promise.all([
+      this.plan.main(month),
+      this.plan.month(month),
+    ]);
+    const mainById = new Map(
+      mainBudget.items.map((i) => [i.categoryId, i.amount]),
+    );
+    const effById = new Map(
+      monthBudget.items.map((i) => [i.categoryId, i.effectiveAmount]),
+    );
+    const budgetLines = cats
+      .filter((c) => !c.isIncome)
+      .map((c) => ({
+        categoryName: c.name,
+        effective: effById.has(c.id)
+          ? (effById.get(c.id) ?? null)
+          : (mainById.get(c.id) ?? null),
+        main: mainById.get(c.id) ?? null,
+      }));
     const prompt = `You are a helpful household budgeting assistant. Amounts are in dollars.
 Monthly history (oldest first; byCategory = amount spent per category):
 ${JSON.stringify(trend)}
 
 Selected month ${month}: income ${current.totalIncome}, spent ${current.totalSpent}, uncategorized spending ${current.uncategorizedSpent}.
-Current monthly budget limits (0 = no limit set):
-${JSON.stringify(cats.filter((c) => !c.isIncome).map((c) => ({ categoryName: c.name, limit: c.budgetLimit })))}
+Budgets for ${month} (effective = what applies this month after one-off adjustments; main = the standing monthly budget; null = none):
+${JSON.stringify(budgetLines)}
 
 Write a short, friendly summary (2-4 sentences) of the spending in ${month} versus previous months, then suggest realistic
-monthly limits for spending categories. Use only these category names: ${cats
+monthly limits for spending categories only — never suggest limits for income or transfer categories. Use only these category names: ${cats
       .filter((c) => !c.isIncome)
       .map((c) => c.name)
       .join(', ')}.
@@ -131,10 +162,7 @@ Return JSON: {"summary": "<text>", "suggestions": [{"categoryName": "<name>", "s
         throw new BadGatewayException(err.message);
       throw err;
     }
-    const parsed = interpretInsightResponse(
-      raw,
-      cats.filter((c) => !c.isIncome),
-    );
+    const parsed = interpretInsightResponse(raw, cats);
     if (!parsed)
       throw new BadGatewayException(
         'The model did not return a usable summary. Try again.',

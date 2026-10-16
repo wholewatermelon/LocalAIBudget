@@ -44,6 +44,32 @@ describe('interpretInsightResponse', () => {
     });
   });
 
+  it('drops suggestions for income and transfer categories (not budgetable)', () => {
+    const r = interpretInsightResponse(
+      {
+        summary: 'ok',
+        suggestions: [
+          { categoryName: 'Income', suggestedLimit: 5000, reason: 'x' },
+          { categoryName: 'Transfer', suggestedLimit: 100, reason: 'x' },
+          { categoryName: 'Food', suggestedLimit: 300, reason: 'avg' },
+        ],
+      },
+      [
+        { id: 1, name: 'Food', isIncome: false, isTransfer: false },
+        { id: 3, name: 'Income', isIncome: true, isTransfer: false },
+        { id: 4, name: 'Transfer', isIncome: false, isTransfer: true },
+      ],
+    );
+    expect(r!.suggestions).toEqual([
+      {
+        categoryId: 1,
+        categoryName: 'Food',
+        suggestedLimit: 300,
+        reason: 'avg',
+      },
+    ]);
+  });
+
   it('rejects responses without a summary', () => {
     expect(interpretInsightResponse({ suggestions: [] }, cats)).toBeNull();
     expect(interpretInsightResponse('text', cats)).toBeNull();

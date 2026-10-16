@@ -53,6 +53,10 @@ Automate the ingestion and categorization of financial statements using locally 
 - [x] End-to-end run against real Postgres + Ollama on synthetic data
 - [x] Code review pass (client↔server contract cross-check), docs/README refresh
 
+### Phase 5: Main budget + monthly adjustments (ARCHITECTURE.md section H)
+- [x] Backend: versioned main budget, month adjustments, seed (actual/budget/average), month view, summary uses effective budget
+- [x] Frontend: Budget page (This month / Main budget tabs, seed dialog, history), Categories cleanup, insights Apply choice
+
 ---
 
 ## Project Phase 2: Family Sharing & Per-Person Visibility (after the MVP above)

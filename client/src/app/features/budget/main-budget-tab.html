@@ -1,0 +1,117 @@
+<div class="toolbar">
+  <span class="as-of">Main budget as of {{ monthLabel() }} — edits ask which month they start from.</span>
+  <button mat-stroked-button (click)="openSeed()" data-testid="open-seed">
+    <mat-icon>auto_awesome_motion</mat-icon> Create from a month…
+  </button>
+</div>
+
+<div class="table-card">
+  @if (loading()) {
+    <mat-progress-bar mode="indeterminate" />
+  }
+  @if (main(); as m) {
+    @if (m.items.length === 0) {
+      <p class="empty-state">No main budget yet. Add categories below or use “Create from a month…”.</p>
+    } @else {
+      <table class="budget">
+        <thead>
+          <tr>
+            <th>Category</th>
+            <th class="num">Monthly amount</th>
+            <th>Since</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (item of m.items; track item.categoryId) {
+            <tr data-testid="main-row">
+              <td>{{ item.categoryName }}</td>
+              <td class="num">
+                <mat-form-field appearance="outline" subscriptSizing="dynamic" class="amount-field">
+                  <span matTextPrefix>$&nbsp;</span>
+                  <input
+                    matInput
+                    #amt
+                    type="number"
+                    min="0"
+                    step="1"
+                    [value]="item.amount"
+                    (change)="edit(item, amt.value)"
+                    [attr.aria-label]="item.categoryName + ' main budget'"
+                    data-testid="main-amount"
+                  />
+                </mat-form-field>
+              </td>
+              <td>
+                {{ fmtMonth(item.effectiveFrom) }}
+                @if (item.hasLaterChange) {
+                  <div class="later" matTooltip="A later version exists; edits starting earlier won't override it">changes later</div>
+                }
+              </td>
+              <td class="actions">
+                <button
+                  mat-icon-button
+                  (click)="toggleHistory(item)"
+                  matTooltip="History"
+                  [attr.aria-expanded]="openHistory() === item.categoryId"
+                  [attr.aria-label]="'History of ' + item.categoryName"
+                  data-testid="history"
+                >
+                  <mat-icon>history</mat-icon>
+                </button>
+                <button mat-icon-button (click)="remove(item)" matTooltip="Remove from main budget" [attr.aria-label]="'Remove ' + item.categoryName" data-testid="remove">
+                  <mat-icon>delete</mat-icon>
+                </button>
+              </td>
+            </tr>
+            @if (openHistory() === item.categoryId) {
+              <tr class="history" data-testid="history-row">
+                <td colspan="4">
+                  @if (history(); as h) {
+                    <ul class="versions">
+                      @for (v of h; track v.effectiveFrom) {
+                        <li>
+                          <strong>{{ fmtMonth(v.effectiveFrom) }}</strong>
+                          <span class="tabular">{{ v.amount === null ? 'removed' : (v.amount | currency) }}</span>
+                          <span class="muted">set {{ v.createdAt | date: 'short' }}</span>
+                          <button mat-button (click)="undo(item.categoryId, v)" data-testid="undo-version">Undo</button>
+                        </li>
+                      }
+                    </ul>
+                  } @else {
+                    <mat-progress-bar mode="indeterminate" />
+                  }
+                </td>
+              </tr>
+            }
+          }
+        </tbody>
+        <tfoot>
+          <tr data-testid="main-total">
+            <th>Total</th>
+            <th class="num tabular">{{ m.total | currency }}</th>
+            <th colspan="2"></th>
+          </tr>
+        </tfoot>
+      </table>
+    }
+  }
+</div>
+
+<form class="add" (ngSubmit)="add()">
+  <span class="add-label">Add to main budget</span>
+  <mat-form-field appearance="outline" subscriptSizing="dynamic">
+    <mat-label>Category</mat-label>
+    <mat-select name="cat" [ngModel]="addCategoryId()" (ngModelChange)="addCategoryId.set($event)">
+      @for (c of addable(); track c.id) {
+        <mat-option [value]="c.id">{{ c.name }}</mat-option>
+      }
+    </mat-select>
+  </mat-form-field>
+  <mat-form-field appearance="outline" subscriptSizing="dynamic" class="amount-field">
+    <mat-label>Amount</mat-label>
+    <span matTextPrefix>$&nbsp;</span>
+    <input matInput type="number" min="0" name="amt" [ngModel]="addAmount()" (ngModelChange)="addAmount.set($event)" />
+  </mat-form-field>
+  <button mat-flat-button type="submit" [disabled]="!canAdd()" data-testid="main-add"><mat-icon>add</mat-icon> Add</button>
+</form>

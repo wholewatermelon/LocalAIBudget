@@ -34,6 +34,9 @@ export interface TrendModel {
   ticks: { y: number; value: number }[];
   incomePath: string;
   incomePoints: { x: number; y: number; value: number; month: string }[];
+  /** Section H: budget line (Σ effective budgets); empty when the server doesn't send totalBudgeted. */
+  budgetPath: string;
+  budgetPoints: { x: number; y: number; value: number; month: string }[];
   plotBottom: number;
   plotLeft: number;
   plotRight: number;
@@ -92,6 +95,7 @@ export function buildTrendModel(points: TrendPoint[], exclude: (name: string) =>
     0,
     ...stacked.map(({ vals }) => [...vals.values()].reduce((a, b) => a + b, 0)),
     ...points.map((p) => Math.abs(p.totalIncome)),
+    ...points.map((p) => p.totalBudgeted ?? 0),
   );
   const top = niceMax(maxVal);
   const plotH = H - PAD.top - PAD.bottom;
@@ -118,9 +122,17 @@ export function buildTrendModel(points: TrendPoint[], exclude: (name: string) =>
 
   const incomePoints = bars.map((b) => ({ x: b.x, y: yOf(b.income), value: b.income, month: b.month }));
   const incomePath = incomePoints.map((pt, i) => `${i ? 'L' : 'M'}${pt.x.toFixed(1)},${pt.y.toFixed(1)}`).join(' ');
+  const hasBudget = points.some((p) => (p.totalBudgeted ?? 0) > 0);
+  const budgetPoints = hasBudget
+    ? bars.map((b, i) => {
+        const v = points[i].totalBudgeted ?? 0;
+        return { x: b.x, y: yOf(v), value: v, month: b.month };
+      })
+    : [];
+  const budgetPath = budgetPoints.map((pt, i) => `${i ? 'L' : 'M'}${pt.x.toFixed(1)},${pt.y.toFixed(1)}`).join(' ');
   const ticks = [0, 0.25, 0.5, 0.75, 1].map((f) => ({ value: top * f, y: yOf(top * f) }));
 
-  return { series, bars, ticks, incomePath, incomePoints, plotBottom: yOf(0), plotLeft: PAD.left, plotRight: W - PAD.right };
+  return { series, bars, ticks, incomePath, incomePoints, budgetPath, budgetPoints, plotBottom: yOf(0), plotLeft: PAD.left, plotRight: W - PAD.right };
 }
 
 @Component({
@@ -136,6 +148,9 @@ export function buildTrendModel(points: TrendPoint[], exclude: (name: string) =>
           <span class="key"><span class="swatch" [style.background]="s.color"></span>{{ s.name }}</span>
         }
         <span class="key"><span class="line-swatch"></span>Income</span>
+        @if (model().budgetPoints.length) {
+          <span class="key"><span class="line-swatch budget"></span>Budget</span>
+        }
       </div>
 
       @if (!showTable()) {
@@ -164,6 +179,19 @@ export function buildTrendModel(points: TrendPoint[], exclude: (name: string) =>
               }
               <text class="tick" [attr.x]="b.x" [attr.y]="model().plotBottom + 18" text-anchor="middle">{{ b.label }}</text>
             }
+            @if (model().budgetPoints.length) {
+              <path class="budget-line" [attr.d]="model().budgetPath" data-testid="budget-line" />
+              @for (p of model().budgetPoints; track p.month) {
+                <circle
+                  class="budget-dot"
+                  [attr.cx]="p.x"
+                  [attr.cy]="p.y"
+                  r="4"
+                  (mouseenter)="hover.set({ x: p.x, y: p.y, title: p.month + ' · Budget', value: p.value })"
+                  (mouseleave)="hover.set(null)"
+                />
+              }
+            }
             <path class="income" [attr.d]="model().incomePath" />
             @for (p of model().incomePoints; track p.month) {
               <circle
@@ -186,7 +214,7 @@ export function buildTrendModel(points: TrendPoint[], exclude: (name: string) =>
       } @else {
         <table class="data-table">
           <thead>
-            <tr><th>Month</th><th>Income</th><th>Spent</th></tr>
+            <tr><th>Month</th><th>Income</th><th>Spent</th><th>Budget</th></tr>
           </thead>
           <tbody>
             @for (p of points(); track p.month) {
@@ -194,6 +222,7 @@ export function buildTrendModel(points: TrendPoint[], exclude: (name: string) =>
                 <td>{{ p.month }}</td>
                 <td class="tabular">{{ p.totalIncome | currency }}</td>
                 <td class="tabular">{{ p.totalSpent | currency }}</td>
+                <td class="tabular">{{ p.totalBudgeted == null ? '—' : (p.totalBudgeted | currency) }}</td>
               </tr>
             }
           </tbody>
@@ -260,6 +289,19 @@ export function buildTrendModel(points: TrendPoint[], exclude: (name: string) =>
       stroke: var(--mat-sys-on-surface);
       stroke-width: 2;
       stroke-dasharray: 5 4;
+    }
+    .line-swatch.budget {
+      border-top: 2px solid var(--mat-sys-primary);
+    }
+    .budget-line {
+      fill: none;
+      stroke: var(--mat-sys-primary);
+      stroke-width: 2;
+    }
+    .budget-dot {
+      fill: var(--mat-sys-primary);
+      stroke: var(--mat-sys-surface);
+      stroke-width: 2;
     }
     .income-dot {
       fill: var(--mat-sys-on-surface);

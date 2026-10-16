@@ -14,12 +14,13 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
+import { MatMenuModule } from '@angular/material/menu';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { Subscription, catchError, map, of, throwError } from 'rxjs';
+import { Observable, Subscription, catchError, map, of, throwError } from 'rxjs';
 import { JobsApi } from '../../core/api/jobs.api';
 import { isActive } from '../../core/job-polling';
 import { InsightsApi } from '../../core/api/insights.api';
-import { CategoryStore } from '../../core/category.store';
+import { BudgetPlanApi } from '../../core/api/budget-plan.api';
 import { errorMessage } from '../../core/http-context';
 import { Insight, InsightSuggestion, Job, Month } from '../../core/models';
 import { NotifyService } from '../../core/notify.service';
@@ -31,7 +32,7 @@ function isTimeout(err: unknown): boolean {
 @Component({
   selector: 'app-insights-panel',
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [MatCardModule, MatButtonModule, MatIconModule, MatProgressSpinnerModule, CurrencyPipe, DatePipe],
+  imports: [MatCardModule, MatButtonModule, MatIconModule, MatMenuModule, MatProgressSpinnerModule, CurrencyPipe, DatePipe],
   template: `
     <mat-card appearance="outlined">
       <mat-card-header>
@@ -74,15 +75,17 @@ function isTimeout(err: unknown): boolean {
                     </span>
                     <div class="reason">{{ s.reason }}</div>
                   </div>
-                  @if (applied().has(s.categoryId)) {
-                    <span class="applied"><mat-icon>check</mat-icon> Applied</span>
+                  @if (applied().get(s.categoryId); as how) {
+                    <span class="applied"><mat-icon>check</mat-icon> {{ how }}</span>
                   } @else {
                     <button
                       mat-stroked-button
-                      (click)="apply(s)"
+                      [matMenuTriggerFor]="applyMenu"
+                      [matMenuTriggerData]="{ s: s }"
                       [disabled]="applying() === s.categoryId"
+                      data-testid="apply"
                     >
-                      Apply
+                      Apply <mat-icon iconPositionEnd>arrow_drop_down</mat-icon>
                     </button>
                   }
                 </li>
@@ -96,6 +99,16 @@ function isTimeout(err: unknown): boolean {
           <p class="error" role="alert">{{ error() }}</p>
         }
       </mat-card-content>
+      <mat-menu #applyMenu="matMenu">
+        <ng-template matMenuContent let-s="s">
+          <button mat-menu-item (click)="applyThisMonth(s)" data-testid="apply-month">
+            <mat-icon>event</mat-icon> Just this month
+          </button>
+          <button mat-menu-item (click)="applyMain(s)" data-testid="apply-main">
+            <mat-icon>event_repeat</mat-icon> Main budget from this month on
+          </button>
+        </ng-template>
+      </mat-menu>
       <mat-card-actions align="end">
         <button mat-flat-button (click)="generate()" [disabled]="generating() || !month()">
           <mat-icon>auto_awesome</mat-icon>
@@ -157,12 +170,14 @@ function isTimeout(err: unknown): boolean {
 })
 export class InsightsPanel {
   private readonly api = inject(InsightsApi);
-  private readonly categories = inject(CategoryStore);
+  private readonly budgetPlan = inject(BudgetPlanApi);
   private readonly notify = inject(NotifyService);
   private readonly jobsApi = inject(JobsApi);
   private readonly destroyRef = inject(DestroyRef);
 
   readonly month = input.required<Month | null>();
+  /** Effective budget per categoryId for the month (from the budget summary), shown as "current → suggested". */
+  readonly budgets = input<ReadonlyMap<number, number | null>>(new Map());
   /** Emitted after a suggestion was applied (budget limits changed). */
   readonly changed = output<void>();
 
@@ -171,14 +186,14 @@ export class InsightsPanel {
   protected readonly generating = signal(false);
   protected readonly error = signal<string | null>(null);
   protected readonly applying = signal<number | null>(null);
-  protected readonly applied = signal<ReadonlySet<number>>(new Set());
+  /** categoryId -> how it was applied ("This month" / "Main budget"). */
+  protected readonly applied = signal<ReadonlyMap<number, string>>(new Map());
   /** True when a processing job is running (it competes for Ollama, so generation is slower). */
   protected readonly aiBusy = signal(false);
 
   private sub?: Subscription;
 
   constructor() {
-    this.categories.ensureLoaded();
     effect(() => {
       const m = this.month();
       untracked(() => this.load(m));
@@ -186,14 +201,14 @@ export class InsightsPanel {
   }
 
   protected currentLimit(s: InsightSuggestion): number | null {
-    return this.categories.byId().get(s.categoryId)?.budgetLimit ?? null;
+    return this.budgets().get(s.categoryId) ?? null;
   }
 
   private load(month: Month | null): void {
     this.sub?.unsubscribe();
     this.insight.set(null);
     this.error.set(null);
-    this.applied.set(new Set());
+    this.applied.set(new Map());
     this.generating.set(false);
     if (!month) return;
     this.loading.set(true);
@@ -240,7 +255,7 @@ export class InsightsPanel {
       .subscribe({
         next: (i) => {
           this.insight.set(i);
-          this.applied.set(new Set());
+          this.applied.set(new Map());
           this.generating.set(false);
         },
         error: (err: unknown) => {
@@ -250,13 +265,27 @@ export class InsightsPanel {
       });
   }
 
-  apply(s: InsightSuggestion): void {
+  /** Apply → "Just this month": PUT the month item (an adjustment for this month only). */
+  applyThisMonth(s: InsightSuggestion): void {
+    const month = this.month();
+    if (!month) return;
+    this.runApply(s, 'This month', this.budgetPlan.setMonthItem(month, s.categoryId, { amount: s.suggestedLimit }), `for ${month}`);
+  }
+
+  /** Apply → "Main budget from this month on": PUT a main version with effectiveFrom = month. */
+  applyMain(s: InsightSuggestion): void {
+    const month = this.month();
+    if (!month) return;
+    this.runApply(s, 'Main budget', this.budgetPlan.setMainItem(s.categoryId, s.suggestedLimit, month), `from ${month} on`);
+  }
+
+  private runApply(s: InsightSuggestion, how: string, req: Observable<unknown>, scope: string): void {
     this.applying.set(s.categoryId);
-    this.categories.update(s.categoryId, { budgetLimit: s.suggestedLimit }).subscribe({
+    req.subscribe({
       next: () => {
         this.applying.set(null);
-        this.applied.update((set) => new Set(set).add(s.categoryId));
-        this.notify.info(`${s.categoryName} budget set to $${s.suggestedLimit.toFixed(2)}`);
+        this.applied.update((m) => new Map(m).set(s.categoryId, how));
+        this.notify.info(`${s.categoryName} budget set to $${s.suggestedLimit.toFixed(2)} ${scope}`);
         this.changed.emit();
       },
       error: (err: unknown) => {

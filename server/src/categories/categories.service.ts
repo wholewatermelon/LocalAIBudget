@@ -16,7 +16,6 @@ import { CategoryAccessService } from './category-access.service';
 export interface Category {
   id: number;
   name: string;
-  budgetLimit: number;
   isIncome: boolean;
   isTransfer: boolean;
   isAiSuggested: boolean;
@@ -33,7 +32,6 @@ function toCategory(r: any): Category {
   return {
     id: r.id,
     name: r.name,
-    budgetLimit: num(r.budget_limit),
     isIncome: !!r.is_income,
     isTransfer: !!r.is_transfer,
     isAiSuggested: !!r.is_ai_suggested,
@@ -84,19 +82,13 @@ export class CategoriesService {
 
   async create(dto: {
     name: string;
-    budgetLimit?: number;
     isIncome?: boolean;
     isTransfer?: boolean;
   }): Promise<Category> {
     try {
       const r = await this.db.one(
-        'INSERT INTO categories (name, budget_limit, is_income, is_transfer) VALUES ($1, $2, $3, $4) RETURNING id',
-        [
-          dto.name.trim(),
-          dto.budgetLimit ?? 0,
-          dto.isIncome ?? false,
-          dto.isTransfer ?? false,
-        ],
+        'INSERT INTO categories (name, is_income, is_transfer) VALUES ($1, $2, $3) RETURNING id',
+        [dto.name.trim(), dto.isIncome ?? false, dto.isTransfer ?? false],
       );
       return this.get(r!.id);
     } catch (err) {
@@ -110,7 +102,6 @@ export class CategoriesService {
     id: number,
     dto: {
       name?: string;
-      budgetLimit?: number;
       isIncome?: boolean;
       isTransfer?: boolean;
     },
@@ -118,12 +109,11 @@ export class CategoriesService {
     await this.get(id);
     try {
       await this.db.query(
-        `UPDATE categories SET name = COALESCE($2, name), budget_limit = COALESCE($3, budget_limit),
-           is_income = COALESCE($4, is_income), is_transfer = COALESCE($5, is_transfer) WHERE id = $1`,
+        `UPDATE categories SET name = COALESCE($2, name),
+           is_income = COALESCE($3, is_income), is_transfer = COALESCE($4, is_transfer) WHERE id = $1`,
         [
           id,
           dto.name?.trim() ?? null,
-          dto.budgetLimit ?? null,
           dto.isIncome ?? null,
           dto.isTransfer ?? null,
         ],

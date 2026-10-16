@@ -49,8 +49,8 @@ describe('categories, accounts, budget, insights (e2e)', () => {
     expect(cats.Income).toMatchObject({
       isIncome: true,
       isTransfer: false,
-      budgetLimit: 0,
     });
+    expect(cats.Income).not.toHaveProperty('budgetLimit');
     expect(cats.Transfer).toMatchObject({ isIncome: false, isTransfer: true });
     expect(cats.Food.transactionCount).toBe(1);
   });
@@ -61,7 +61,7 @@ describe('categories, accounts, budget, insights (e2e)', () => {
     await ctx
       .http()
       .post('/api/categories')
-      .send({ name: 'Pets', budgetLimit: -1 })
+      .send({ name: 'Pets', isIncome: 'x' })
       .expect(400);
     const pets = (
       await ctx
@@ -70,9 +70,10 @@ describe('categories, accounts, budget, insights (e2e)', () => {
         .send({ name: 'Pets', budgetLimit: 50 })
         .expect(201)
     ).body;
+    // budgetLimit is gone from the Category API (section H): stripped by the whitelist, never returned.
+    expect(pets).not.toHaveProperty('budgetLimit');
     expect(pets).toMatchObject({
       name: 'Pets',
-      budgetLimit: 50,
       isIncome: false,
       isTransfer: false,
       transactionCount: 0,
@@ -84,7 +85,8 @@ describe('categories, accounts, budget, insights (e2e)', () => {
         .send({ budgetLimit: 75.5, name: 'Pet Care' })
         .expect(200)
     ).body;
-    expect(upd).toMatchObject({ name: 'Pet Care', budgetLimit: 75.5 });
+    expect(upd).toMatchObject({ name: 'Pet Care' });
+    expect(upd).not.toHaveProperty('budgetLimit');
     // isTransfer is accepted on PATCH and POST (client sends it).
     const asTransfer = (
       await ctx
@@ -164,8 +166,8 @@ describe('categories, accounts, budget, insights (e2e)', () => {
   it('budget summary: splits-aware, transfers and income excluded from spending', async () => {
     await ctx
       .http()
-      .patch(`/api/categories/${cats.Food.id}`)
-      .send({ budgetLimit: 200 })
+      .put(`/api/budget/main/items/${cats.Food.id}`)
+      .send({ amount: 200, effectiveFrom: '2024-03' })
       .expect(200);
     const walmart = (
       await ctx.http().get('/api/transactions?search=walmart').expect(200)
@@ -240,12 +242,14 @@ describe('categories, accounts, budget, insights (e2e)', () => {
       month: '2024-01',
       totalIncome: 0,
       totalSpent: 0,
+      totalBudgeted: 0,
       byCategory: {},
     });
     expect(t[2]).toEqual({
       month: '2024-03',
       totalIncome: 3000,
       totalSpent: 220,
+      totalBudgeted: 200,
       byCategory: { Food: 170, Shopping: 30 },
     });
     const anchored = (

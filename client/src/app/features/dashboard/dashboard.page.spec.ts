@@ -2,7 +2,16 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import { makeCategory, makeInsight, makeJob, makeMonth, makeSummary } from '../../../testing/fixtures';
+import {
+  makeCategory,
+  makeInsight,
+  makeJob,
+  makeMonth,
+  makeMonthBudget,
+  makeMonthItem,
+  makeSummary,
+} from '../../../testing/fixtures';
+import { SKIP_ERROR_SNACKBAR } from '../../core/http-context';
 import { INSIGHT_TIMEOUT_MS } from '../../core/api/insights.api';
 import { monthServiceStub } from '../../../testing/month-service.stub';
 import { MonthSummary } from '../../core/models';
@@ -27,8 +36,14 @@ describe('DashboardPage', () => {
     fixture.detectChanges();
   }
 
-  function flushInitial(summary = makeSummary()) {
-    http.expectOne('/api/categories').flush([makeCategory({ id: 1, name: 'Food', budgetLimit: 400 }), makeCategory({ id: 6, name: 'Income', isIncome: true })]);
+  function flushMonthView(items = [makeMonthItem({ categoryId: 1 })]) {
+    const req = http.expectOne((r) => r.url === '/api/budget/month' && r.params.get('month') === '2024-01');
+    expect(req.request.context.get(SKIP_ERROR_SNACKBAR)).toBeTrue();
+    req.flush(makeMonthBudget(items));
+  }
+
+  function flushInitial(summary = makeSummary(), monthItems = [makeMonthItem({ categoryId: 1 })]) {
+    http.expectOne('/api/categories').flush([makeCategory({ id: 1, name: 'Food' }), makeCategory({ id: 6, name: 'Income', isIncome: true })]);
     http.expectOne((r) => r.url === '/api/budget/summary' && r.params.get('month') === '2024-01').flush(summary);
     const trend = http.expectOne((r) => r.url === '/api/budget/trend');
     expect(trend.request.params.get('month')).toBe('2024-01'); // anchored at the selected month
@@ -36,6 +51,7 @@ describe('DashboardPage', () => {
       { month: '2023-12', totalIncome: 3000, totalSpent: 900, byCategory: { Food: 300, Housing: 600, Income: 3000 } },
       { month: '2024-01', totalIncome: 3000, totalSpent: 1200, byCategory: { Food: 350, Housing: 850, Transfer: 500 } },
     ]);
+    flushMonthView(monthItems);
     fixture.detectChanges(); // renders the insights panel, which then fetches the latest insight
     http.expectOne((r) => r.url === '/api/insights').flush(makeInsight());
     fixture.detectChanges();
@@ -75,7 +91,7 @@ describe('DashboardPage', () => {
       makeSummary({
         categories: [
           { categoryId: 1, name: 'Food', budgetLimit: 400, spent: 100, remaining: 300, percentUsed: 25, isIncome: false, isTransfer: false },
-          { categoryId: 7, name: 'Card Payments', budgetLimit: 0, spent: 900, remaining: 0, percentUsed: null, isIncome: false, isTransfer: true },
+          { categoryId: 7, name: 'Card Payments', budgetLimit: null, spent: 900, remaining: null, percentUsed: null, isIncome: false, isTransfer: true },
           { categoryId: 8, name: 'Transfer', budgetLimit: 50, spent: 10, remaining: 40, percentUsed: 20, isIncome: false, isTransfer: false },
         ],
       }),
@@ -83,6 +99,7 @@ describe('DashboardPage', () => {
     http.expectOne((r) => r.url === '/api/budget/trend').flush([
       { month: '2024-01', totalIncome: 0, totalSpent: 110, byCategory: { Food: 100, 'Card Payments': 900, Transfer: 10 } },
     ]);
+    flushMonthView([]);
     fixture.detectChanges();
     http.expectOne((r) => r.url === '/api/insights').flush(null);
     fixture.detectChanges();
@@ -119,18 +136,70 @@ describe('DashboardPage', () => {
     expect(el.querySelector('[data-testid="needs-review-link"]')).toBeNull();
   });
 
-  it('applying a suggestion PATCHes the category and refreshes the summary', () => {
-    setup();
-    flushInitial();
-    el.querySelector<HTMLButtonElement>('[data-testid="suggestion"] button')!.click();
-    const patch = http.expectOne({ method: 'PATCH', url: '/api/categories/1' });
-    expect(patch.request.body).toEqual({ budgetLimit: 350 });
-    patch.flush(makeCategory({ id: 1, budgetLimit: 350 }));
-    // refresh
+  function openApplyMenu(): void {
+    el.querySelector<HTMLButtonElement>('[data-testid="apply"]')!.click();
+    fixture.detectChanges();
+  }
+
+  function flushReload() {
     http.expectOne((r) => r.url === '/api/budget/summary').flush(makeSummary());
     http.expectOne((r) => r.url === '/api/budget/trend').flush([]);
+    flushMonthView();
     fixture.detectChanges();
-    expect(el.querySelector('[data-testid="suggestion"]')?.textContent).toContain('Applied');
+  }
+
+  it('shows current effective budget -> suggested in the suggestion', () => {
+    setup();
+    flushInitial();
+    expect(el.querySelector('[data-testid="suggestion"]')?.textContent).toContain('$400.00 →');
+  });
+
+  it('Apply → "Just this month" PUTs the month item and refreshes the dashboard', () => {
+    setup();
+    flushInitial();
+    openApplyMenu();
+    document.querySelector<HTMLButtonElement>('[data-testid="apply-month"]')!.click();
+    const put = http.expectOne({ method: 'PUT', url: '/api/budget/month/2024-01/items/1' });
+    expect(put.request.body).toEqual({ amount: 350 });
+    put.flush(makeMonthBudget([]));
+    flushReload();
+    expect(el.querySelector('[data-testid="suggestion"]')?.textContent).toContain('This month');
+  });
+
+  it('Apply → "Main budget from this month on" PUTs a main version effective this month', () => {
+    setup();
+    flushInitial();
+    openApplyMenu();
+    document.querySelector<HTMLButtonElement>('[data-testid="apply-main"]')!.click();
+    const put = http.expectOne({ method: 'PUT', url: '/api/budget/main/items/1' });
+    expect(put.request.body).toEqual({ amount: 350, effectiveFrom: '2024-01' });
+    put.flush({ month: '2024-01', items: [], total: 0 });
+    flushReload();
+    expect(el.querySelector('[data-testid="suggestion"]')?.textContent).toContain('Main budget');
+  });
+
+  it('shows "adjusted" / "this month only" markers on budget bars from the month view', () => {
+    setup();
+    flushInitial(makeSummary(), [
+      makeMonthItem({ categoryId: 1, source: 'adjusted', adjustedAmount: 400 }),
+      makeMonthItem({ categoryId: 2, categoryName: 'Housing', source: 'main' }),
+    ]);
+    const rows = Array.from(el.querySelectorAll('[data-testid="budget-row"]'));
+    expect(rows[0].querySelector('[data-testid="adjusted-marker"]')?.textContent).toContain('adjusted');
+    expect(rows[1].querySelector('[data-testid="adjusted-marker"]')).toBeNull();
+  });
+
+  it('still renders when the month view endpoint fails (no markers, no snackbar)', () => {
+    setup();
+    http.expectOne('/api/categories').flush([makeCategory({ id: 1 })]);
+    http.expectOne((r) => r.url === '/api/budget/summary').flush(makeSummary());
+    http.expectOne((r) => r.url === '/api/budget/trend').flush([]);
+    http.expectOne((r) => r.url === '/api/budget/month').flush({}, { status: 404, statusText: 'Not Found' });
+    fixture.detectChanges();
+    http.expectOne((r) => r.url === '/api/insights').flush(null);
+    fixture.detectChanges();
+    expect(el.querySelectorAll('[data-testid="budget-row"]').length).toBe(2);
+    expect(el.querySelector('[data-testid="adjusted-marker"]')).toBeNull();
   });
 
   it('generate shows a spinner while waiting, then the new insight', () => {

@@ -1,0 +1,151 @@
+:host {
+  display: block;
+  padding-top: 16px;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 12px;
+
+  .as-of {
+    flex: 1;
+    color: var(--mat-sys-on-surface-variant);
+  }
+}
+
+.table-card {
+  border: 1px solid var(--mat-sys-outline-variant);
+  border-radius: 12px;
+  overflow-x: auto;
+}
+
+.budget {
+  width: 100%;
+  border-collapse: collapse;
+
+  th,
+  td {
+    text-align: left;
+    padding: 6px 12px;
+    border-bottom: 1px solid var(--mat-sys-outline-variant);
+    vertical-align: middle;
+  }
+  th {
+    font: var(--mat-sys-label-medium);
+    color: var(--mat-sys-on-surface-variant);
+  }
+  tfoot th {
+    font: var(--mat-sys-title-small);
+    color: var(--mat-sys-on-surface);
+    border-bottom: none;
+  }
+  .num {
+    text-align: right;
+  }
+  .actions {
+    white-space: nowrap;
+    width: 1%;
+  }
+  tr.greyed td {
+    color: var(--mat-sys-on-surface-variant);
+    opacity: 0.7;
+  }
+  tr.history td {
+    background: var(--mat-sys-surface-container-low);
+  }
+}
+
+.cat {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.chip {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 10px;
+  font: var(--mat-sys-label-small);
+  background: var(--mat-sys-surface-container-high);
+  color: var(--mat-sys-on-surface-variant);
+
+  &.adjusted {
+    background: var(--mat-sys-tertiary-container);
+    color: var(--mat-sys-on-tertiary-container);
+  }
+  &.month-only {
+    background: var(--mat-sys-secondary-container);
+    color: var(--mat-sys-on-secondary-container);
+  }
+}
+
+.note {
+  margin-top: 2px;
+  width: 100%;
+  max-width: 260px;
+  border: none;
+  border-bottom: 1px dashed var(--mat-sys-outline-variant);
+  background: transparent;
+  color: var(--mat-sys-on-surface-variant);
+  font: var(--mat-sys-body-small);
+  padding: 2px 0;
+  outline: none;
+
+  &:focus {
+    border-bottom-color: var(--mat-sys-primary);
+  }
+}
+
+.amount-field {
+  width: 140px;
+  --mat-form-field-container-height: 36px;
+  --mat-form-field-container-vertical-padding: 6px;
+}
+
+.muted {
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.over {
+  color: var(--mat-sys-error);
+}
+
+.later {
+  font: var(--mat-sys-label-small);
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.add {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+
+  .add-label {
+    font: var(--mat-sys-title-small);
+  }
+  mat-form-field {
+    width: 200px;
+  }
+  .amount-field {
+    width: 140px;
+  }
+}
+
+.versions {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+
+  li {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 2px 0;
+  }
+}

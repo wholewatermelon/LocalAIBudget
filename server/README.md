@@ -37,6 +37,8 @@ From the repo root `npm run dev` starts server + client. The server binds to **1
   - `001_initial_schema.sql` — upgrades the hand-made legacy schema (merges duplicate accounts before adding UNIQUE,
     re-creates the splits FK with `ON DELETE CASCADE`, seeds categories incl. `Transfer` with `is_transfer`).
   - `002_rules_reconciliation_transfers_review.sql` — category_rules, reconciliation columns, transfer pairs, review flags.
+  - `003_main_budget_and_month_adjustments.sql` — `budget_main_items` (versions by `effective_from`, NULL amount = removed)
+    and `budget_month_items` (per-month override / hidden / note); moves `categories.budget_limit` into main and drops it.
 - `npm run db:reset -- --yes` drops and recreates the `public` schema of `DB_NAME`, then migrates. Without `--yes` it refuses.
 
 ## Tests
@@ -71,8 +73,17 @@ npm run test:e2e    # e2e (supertest) against localaibudget_test
 | `transactions/` | list/filter, PATCH correction / reviewed, PUT splits (`split-validation.ts`), bulk review |
 | `rules/` | category rules CRUD, preview, suggest (`deriveMerchantKey`), apply to existing |
 | `categories/`, `accounts/` | CRUD; `CategoryAccessService` = single choke point for future per-person category visibility |
-| `budget/` | `budget-math.ts` (pure), summary + trend (splits-aware, by `transaction_date`) |
+| `budget/` | `budget-math.ts` (pure), summary + trend (splits-aware, by `transaction_date`, budgets = effective budget); `budget-plan.ts` (pure: main-as-of, effective resolution, seed rounding/average/tombstones) + `BudgetPlanService`/controller for `/budget/main*` and `/budget/month*` (section H) |
 | `insights/` | Gemma summary + limit suggestions, validated and stored in `ai_insights` |
+
+## Budgets (ARCHITECTURE.md section H)
+
+- Effective budget for (month, category) = month adjustment if present (hidden → none), else the latest main version with
+  `effective_from <= month` (a NULL version is a tombstone). Only spending categories (not income/transfer) are budgetable.
+- Summary/trend/insights read budgets through `BudgetService.effectiveBudgets()`; all budget reads use the categories returned
+  by `BudgetService.categories()`, which applies `CategoryAccessService`.
+- Seeding (`actual` / `budget` / `average`) rounds **up** to `roundTo`, drops zero amounts, skips months without any transactions
+  when averaging, and writes NULL tombstones for categories in main but not in the proposal (one transaction).
 
 ## Processing pipeline (POST /api/jobs/process)
 

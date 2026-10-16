@@ -65,6 +65,21 @@ describe('buildTrendModel', () => {
     expect(m.bars[0].segments.map((s) => s.key)).toEqual(['Food']);
   });
 
+  it('draws a budget line from totalBudgeted (and none for older payloads)', () => {
+    const withBudget = buildTrendModel(
+      [
+        { month: '2024-01', totalIncome: 0, totalSpent: 100, totalBudgeted: 3000, byCategory: { Food: 100 } },
+        { month: '2024-02', totalIncome: 0, totalSpent: 100, totalBudgeted: 3200, byCategory: { Food: 100 } },
+      ],
+      () => false,
+    );
+    expect(withBudget.budgetPoints.map((p) => p.value)).toEqual([3000, 3200]);
+    expect(withBudget.budgetPath).toMatch(/^M.+L.+/);
+    expect(withBudget.ticks.at(-1)!.value).toBeGreaterThanOrEqual(3200); // axis covers the budget
+    const old = buildTrendModel([pt('2024-01', { Food: 100 })], () => false);
+    expect(old.budgetPoints).toEqual([]);
+  });
+
   it('handles empty data', () => {
     const m = buildTrendModel([], () => false);
     expect(m.bars).toEqual([]);

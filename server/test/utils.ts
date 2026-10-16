@@ -152,7 +152,7 @@ export async function resetDb(db: DbService): Promise<void> {
     throw new Error('resetDb refused: not a *_test database');
   }
   await db.query(
-    `TRUNCATE ai_insights, processing_jobs, transaction_splits, transactions, statement_files, category_rules, accounts, categories
+    `TRUNCATE budget_month_items, budget_main_items, ai_insights, processing_jobs, transaction_splits, transactions, statement_files, category_rules, accounts, categories
      RESTART IDENTITY CASCADE`,
   );
   await db.query(

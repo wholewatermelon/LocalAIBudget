@@ -40,7 +40,9 @@ src/
       dashboard/              page, totals cards, budget bars (+ budget-status.ts), insights panel, SVG trend chart
       process/                page, upload zone, statement list (+ reconciliation badge), job progress, job history
       transactions/           page (table, filters, review queue), split dialog, split-validation.ts
-      categories/             page
+      budget/                 page (tabs), month-budget-tab, main-budget-tab, seed + apply-starting dialogs,
+                              budget-logic.ts (pure: row state, edit actions, seed request/diff)
+      categories/             page (no budget column; "Edit budgets →" links to /budget?tab=main)
       rules/                  page (list/edit/delete, create with live preview)
   testing/                    fixtures.ts, month-service.stub.ts (test-only; excluded from the app build)
 ```
@@ -96,6 +98,11 @@ to `input()`s (router `withComponentInputBinding`). Add a `*.page.spec.ts` using
 - Insight generation times out client-side after 300s; on timeout the panel re-GETs `/api/insights` once in case the
   server saved a result after the client gave up.
 - Job progress is indeterminate while `queued` or while a running job reports `processed >= total`.
+
+- **Budgets (ARCHITECTURE §H)**: amounts live in `BudgetPlanApi`, not on categories. Main-budget edits always go
+  through the "Apply starting:" dialog (default = selected month). In the month view, setting an adjusted amount back to
+  the main amount (no note) sends DELETE (reset) instead of creating a redundant adjustment; note-only edits send `{ note }`.
+  The dashboard reads `GET /api/budget/month` (quietly) only for the adjusted / month-only markers.
 
 ## Contract assumptions (see ARCHITECTURE.md)
 

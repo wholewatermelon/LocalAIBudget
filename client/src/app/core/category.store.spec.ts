@@ -41,9 +41,9 @@ describe('CategoryStore', () => {
     http.expectOne({ method: 'POST', url: '/api/categories' }).flush(makeCategory({ id: 5, name: 'Pets' }));
     expect(store.categories().length).toBe(2);
 
-    store.update(1, { budgetLimit: 99 }).subscribe();
-    http.expectOne({ method: 'PATCH', url: '/api/categories/1' }).flush(makeCategory({ id: 1, name: 'Food', budgetLimit: 99 }));
-    expect(store.byId().get(1)?.budgetLimit).toBe(99);
+    store.update(1, { name: 'Groceries' }).subscribe();
+    http.expectOne({ method: 'PATCH', url: '/api/categories/1' }).flush(makeCategory({ id: 1, name: 'Groceries' }));
+    expect(store.byId().get(1)?.name).toBe('Groceries');
 
     store.delete(5).subscribe();
     http.expectOne({ method: 'DELETE', url: '/api/categories/5' }).flush(null);

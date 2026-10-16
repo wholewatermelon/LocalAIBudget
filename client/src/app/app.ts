@@ -126,6 +126,7 @@ export class App {
     { path: '/', label: 'Dashboard', icon: 'dashboard' },
     { path: '/process', label: 'Process', icon: 'upload_file' },
     { path: '/transactions', label: 'Transactions', icon: 'receipt_long' },
+    { path: '/budget', label: 'Budget', icon: 'account_balance_wallet' },
     { path: '/categories', label: 'Categories', icon: 'category' },
     { path: '/rules', label: 'Rules', icon: 'rule_settings' },
   ];
